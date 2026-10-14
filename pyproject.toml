@@ -1,0 +1,37 @@
+[project]
+name = "plugin-engine"
+version = "0.1.0"
+description = "The plugin engine: runs approved kabinet releases as Docker containers"
+readme = "README.md"
+authors = [
+    { name = "Johannes Roos", email = "jhnnsrs@gmail.com" }
+]
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "arkitekt[all]>=6.6.1",
+    # Pages through a backend's pods (MyPods) and reads a pod that may be gone (myPodAt).
+    "kabinet>=5.2.0",
+    "docker",
+]
+
+# The app is app.py, not a package: the image copies the project and runs that module.
+[tool.uv]
+package = false
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+addopts = "-m 'not hub'"
+
+[tool.semantic_release]
+version_variables = ["app.py:__version__"]
+commit_message = "chore(release): {version} [skip ci]"
+tag_format = "v{version}"
+allow_zero_version = true
+
+[tool.semantic_release.branches.release]
+match = "main"
+prerelease = false
