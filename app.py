@@ -52,6 +52,8 @@ Configuration (environment)
 ``KABINET_DEPLOYER_ID``        label value that marks containers as ours (default: hostname)
 ``ARKITEKT_GATEWAY``           the fakts URL handed to containers (default: go.arkitekt.live)
 ``ARKITEKT_NETWORK``           docker network containers join (default: next_default)
+``FAKTS_ALLOW_INSECURE_TRANSPORT`` lets the engine log in over plain HTTP, and is passed on
+                               to every app it starts (a hub's gateway on its own network)
 ``ARKITEKT_NETWORK_MODE``      a docker network mode for containers instead, e.g.
                                ``container:<mesh sidecar>`` to share its tailnet (unset)
 ``DEPLOYER_GPU_PROBE_IMAGE``   the image the GPU probe runs nvidia-smi in, when this
@@ -140,6 +142,9 @@ ARKITEKT_GATEWAY = os.getenv("ARKITEKT_GATEWAY", "https://go.arkitekt.live")
 ARKITEKT_NETWORK = os.getenv("ARKITEKT_NETWORK", "next_default")
 ARKITEKT_NETWORK_MODE = os.getenv("ARKITEKT_NETWORK_MODE") or None
 GPU_PROBE_IMAGE = os.getenv("DEPLOYER_GPU_PROBE_IMAGE", "debian:stable-slim")
+#: Passed on to every app: a hub reached over plain HTTP (its gateway, on its own docker
+#: network) is one the engine was told it may send a credential to, and so are its apps.
+INSECURE_TRANSPORT = os.getenv("FAKTS_ALLOW_INSECURE_TRANSPORT") or None
 _allowed = {s.strip() for s in os.getenv("DEPLOYER_ALLOWED_SCOPES", "").split(",") if s.strip()}
 ALLOWED_SCOPES: frozenset[str] | None = frozenset(_allowed) if _allowed else None
 _approvers = {s.strip() for s in os.getenv("DEPLOYER_ACCEPT_APPROVERS", "").split(",") if s.strip()}
@@ -1004,6 +1009,7 @@ def _start_container(
             # The token is pinned to this device id; the app puts it in its manifest.
             "ARKITEKT_DEVICE_ID": device_id,
             "ARKITEKT_HEADLESS": "1",
+            **({"FAKTS_ALLOW_INSECURE_TRANSPORT": INSECURE_TRANSPORT} if INSECURE_TRANSPORT else {}),
         },
         device_requests=_device_requests(flavour),
     )

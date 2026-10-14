@@ -465,6 +465,17 @@ def test_a_plugin_joins_the_engines_network():
     assert "network_mode" not in docker_client.run_kwargs
 
 
+def test_a_plugin_logs_in_over_plain_http_only_where_the_engine_may(monkeypatch):
+    docker_client = FakeDocker()
+    launch(docker_client, FakeKabinet())
+    assert "FAKTS_ALLOW_INSECURE_TRANSPORT" not in docker_client.run_kwargs["environment"]
+
+    # On a hub's own network the gateway answers plain HTTP, and the engine was told so.
+    monkeypatch.setattr(D, "INSECURE_TRANSPORT", "1")
+    launch(docker_client, FakeKabinet())
+    assert docker_client.run_kwargs["environment"]["FAKTS_ALLOW_INSECURE_TRANSPORT"] == "1"
+
+
 def test_a_network_mode_replaces_the_network():
     # On the mesh the engine shares a sidecar's namespace, and so must every plugin.
     docker_client = FakeDocker()
