@@ -121,7 +121,7 @@ from unlok.api.schema import ProvisionedToken
 logger = logging.getLogger(__name__)
 
 # The version of the app. A release is the commit tagged with it (v1.2.3).
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 AGENT_IDENTIFIER = "plugin_engine"
 """The app identifier a mandate must name for this deployer to provision under it."""
