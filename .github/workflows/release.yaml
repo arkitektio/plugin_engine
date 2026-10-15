@@ -33,7 +33,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: uvx --from "python-semantic-release>=10,<11" semantic-release version
-      - uses: arkitektio/arkitekt/ci/github@v6.6.1
+      - uses: arkitektio/arkitekt/ci/github@v6.7.1
         with:
           target: app
           # The commit semantic-release tagged is that release, not a build of the branch.
