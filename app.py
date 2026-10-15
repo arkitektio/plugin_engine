@@ -135,6 +135,136 @@ app = App(
     services=[kabinet_service, unlok_service],
 )
 
+# --- logos ------------------------------------------------------------------------
+
+# The app's logo, in colours of its own: app containers fitted together like puzzle
+# pieces, with the engine's gear turning beside them.
+app.blok(
+    "plugin_engine_logo",
+    """
+    <SVG viewBox="0 0 64 64" title="Plugin engine">
+      <Defs>
+        <LinearGradient id="ground" x1="0" y1="0" x2="1" y2="1">
+          <Stop offset="0" stopColor="#140d2b" />
+          <Stop offset="1" stopColor="#2b1d58" />
+        </LinearGradient>
+        <ClipPath id="tile"><Rect x="0" y="0" width="64" height="64" rx="14" /></ClipPath>
+      </Defs>
+      <G clipPath="url(#tile)">
+        <Rect x="0" y="0" width="64" height="64" fill="url(#ground)" />
+        <G animate="spin">
+          <Circle cx="50" cy="14" r="7" fill="none" stroke="#94a3b8" strokeWidth="4" strokeDasharray="2.75 2.75" />
+          <Circle cx="50" cy="14" r="6" fill="#94a3b8" />
+          <Circle cx="50" cy="14" r="2.4" fill="#211645" />
+        </G>
+        <Rect x="33" y="38" width="22" height="16" rx="2" fill="#a78bfa" />
+        <Path d="M38 41v10M43 41v10M48 41v10" stroke="#2e1065" strokeOpacity="0.35" strokeWidth="1.6" strokeLinecap="round" />
+        <Rect x="9" y="38" width="22" height="16" rx="2" fill="#38bdf8" />
+        <Circle cx="32" cy="46" r="3.6" fill="#38bdf8" />
+        <Path d="M14 41v10M19 41v10M24 41v10" stroke="#082f49" strokeOpacity="0.35" strokeWidth="1.6" strokeLinecap="round" />
+        <Rect x="21" y="20" width="22" height="16" rx="2" fill="#34d399" />
+        <Circle cx="32" cy="36.5" r="3.6" fill="#34d399" />
+        <Path d="M26 23v10M31 23v10M36 23v10" stroke="#064e3b" strokeOpacity="0.35" strokeWidth="1.6" strokeLinecap="round" />
+      </G>
+      <Rect x="0.5" y="0.5" width="63" height="63" rx="13.5" fill="none" stroke="#a78bfa" strokeOpacity="0.3" strokeWidth="1" />
+    </SVG>
+    """,
+    description="App containers fitted together like puzzle pieces, beside a turning gear.",
+    context="logo",
+    default=True,
+)
+
+# The actions' logos, in the viewer's palette. Strokes are ink and round unless a shape
+# says otherwise; fills are off, since SVG's own default fill is black.
+_PEN = 'fill="none" stroke="ink" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"'
+
+
+def _container(x: float, y: float, width: float, height: float, fill: str = "surface") -> str:
+    """An app's container: a box with ribs, the way the app logo draws one."""
+    ribs = "".join(f"M{x + width * share:.1f} {y + 2.5}v{height - 5}" for share in (0.3, 0.5, 0.7))
+    return (
+        f'<Rect x="{x}" y="{y}" width="{width}" height="{height}" rx="1.5" fill="{fill}" />'
+        f'<Path d="{ribs}" stroke="muted" strokeWidth="1.4" />'
+    )
+
+
+def _action_logo(name: str, title: str, body: str) -> str:
+    """Declare the action logo ``name`` that draws ``body`` on a 24 px grid; returns the name."""
+    app.blok(
+        name,
+        f'<ActionLogo viewBox="0 0 24 24" title="{title}"><G {_PEN}>{body}</G></ActionLogo>',
+        description=f"{title}.",
+        context="action_logo",
+    )
+    return name
+
+
+INSTALL_LOGO = _action_logo(
+    "plugin_engine_install_logo",
+    "Install an approved release",
+    _container(3, 11, 18, 10)
+    + '<G animate="float"><Path d="M12 2.5v7.5M8.5 6.5l3.5 3.5 3.5-3.5" stroke="brand-strong" strokeWidth="2" /></G>',
+)
+DEPLOY_FLAVOUR_LOGO = _action_logo(
+    "plugin_engine_deploy_flavour_logo",
+    "Deploy one flavour",
+    _container(2.5, 9, 15, 11)
+    + '<Path d="M14.5 2.5h5.5a1.5 1.5 0 0 1 1.5 1.5v5.5l-5.5 5.5-7-7z" fill="brand" />'
+    + '<Circle cx="18.2" cy="5.8" r="1.2" fill="surface" stroke="none" animate="pulse" />',
+)
+AUTO_INSTALL_LOGO = _action_logo(
+    "plugin_engine_auto_install_logo",
+    "Install whatever provides a definition",
+    _container(3, 12, 18, 9.5)
+    + '<Path d="M12 2l1.2 3.3 3.3 1.2-3.3 1.2L12 11l-1.2-3.3L7.5 6.5l3.3-1.2z" fill="brand" stroke="none" animate="pulse" />'
+    + '<Path d="M19 2l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z" fill="brand-strong" stroke="none" animate="blink" />'
+    + '<Path d="M4.5 5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4L2.5 7l1.4-.6z" fill="brand-strong" stroke="none" animate="blink" animateDelay="0.4" />',
+)
+REFRESH_LOGS_LOGO = _action_logo(
+    "plugin_engine_refresh_logs_logo",
+    "Refresh a pod's logs",
+    '<Path d="M4.5 2.5h9l4.5 4.5v6" fill="surface" /><Path d="M4.5 2.5v19h8" />'
+    + '<Path d="M13.5 2.5V7H18" /><Path d="M7.5 10h7M7.5 13h5M7.5 16h3" stroke="muted" strokeWidth="1.4" />'
+    + '<G animate="spin"><Path d="M20.6 15.4a4 4 0 1 0 .4 3.6" stroke="brand-strong" />'
+    + '<Path d="M21 12.5v3h-3" stroke="brand-strong" /></G>',
+)
+STOP_LOGO = _action_logo(
+    "plugin_engine_stop_logo",
+    "Stop a pod's container",
+    _container(2.5, 5, 15, 11)
+    + '<Circle cx="17.5" cy="17.5" r="5" fill="surface" />'
+    + '<Rect x="15.6" y="15.6" width="3.8" height="3.8" rx="0.6" fill="brand-strong" stroke="none" animate="pulse" />',
+)
+RESTART_LOGO = _action_logo(
+    "plugin_engine_restart_logo",
+    "Restart a pod's container",
+    '<Rect x="8" y="9" width="8" height="6" rx="1" fill="brand-soft" strokeWidth="1.5" />'
+    + '<G animate="spin"><Path d="M20.5 12a8.5 8.5 0 1 1-2.5-6" stroke="brand-strong" strokeWidth="2" />'
+    + '<Path d="M18.5 2v4h-4" stroke="brand-strong" strokeWidth="2" /></G>',
+)
+REAUTHORIZE_LOGO = _action_logo(
+    "plugin_engine_reauthorize_logo",
+    "Give a pod a fresh token",
+    '<Path d="M3.5 8.5A9.5 9.5 0 0 1 19 5.5" stroke="brand-strong" animate="draw" />'
+    + '<Path d="M19.6 2.2v3.6H16" stroke="brand-strong" />'
+    + '<Circle cx="7.5" cy="15" r="4" fill="brand-soft" />'
+    + '<Circle cx="7.5" cy="15" r="1.3" fill="surface" strokeWidth="1.4" />'
+    + '<Path d="M11.5 15h10M18.5 15v3M15.5 15v2.5" />',
+)
+REMOVE_LOGO = _action_logo(
+    "plugin_engine_remove_logo",
+    "Remove a pod",
+    '<Path d="M5.5 7l1 13.5A1.5 1.5 0 0 0 8 22h8a1.5 1.5 0 0 0 1.5-1.5l1-13.5" fill="surface" />'
+    + '<Path d="M10 11v7M14 11v7" stroke="brand" />'
+    + '<G animate="float"><Path d="M3.5 7h17" /><Path d="M9 7V4.5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1V7" /></G>',
+)
+UPGRADE_LOGO = _action_logo(
+    "plugin_engine_upgrade_logo",
+    "Upgrade a pod to a newer release",
+    _container(3, 11, 18, 10)
+    + '<G animate="float"><Path d="M12 10V2.5M8.5 6L12 2.5 15.5 6" stroke="brand-strong" strokeWidth="2" /></G>',
+)
+
 # --- configuration ------------------------------------------------------------
 
 DEPLOYER_ID = os.getenv("KABINET_DEPLOYER_ID", socket.gethostname())
@@ -1117,7 +1247,7 @@ def _install(kabinet: Kabinet, unlok: Unlok, task: Task, ctx: DeployerContext, a
     return _deploy_flavour(kabinet, unlok, task, ctx, kabinet.get_flavour(chosen.id), approval)
 
 
-@app.action(effects=Effects.IRREVERSIBLE)
+@app.action(effects=Effects.IRREVERSIBLE, logo=INSTALL_LOGO)
 def install(
     approval: ReleaseApproval, context: DeployerContext, kabinet: Kabinet, unlok: Unlok, task: Task
 ) -> Pod:
@@ -1129,7 +1259,7 @@ def install(
     return _install(kabinet, unlok, task, context, approval)
 
 
-@app.action(effects=Effects.IRREVERSIBLE)
+@app.action(effects=Effects.IRREVERSIBLE, logo=DEPLOY_FLAVOUR_LOGO)
 def deploy_flavour(
     flavour: Flavour, approval: ReleaseApproval, context: DeployerContext, kabinet: Kabinet, unlok: Unlok, task: Task
 ) -> Pod:
@@ -1140,7 +1270,7 @@ def deploy_flavour(
     return _deploy_flavour(kabinet, unlok, task, context, flavour, approval)
 
 
-@app.action(effects=Effects.IRREVERSIBLE)
+@app.action(effects=Effects.IRREVERSIBLE, logo=AUTO_INSTALL_LOGO)
 def auto_install(
     definition: Definition, context: DeployerContext, kabinet: Kabinet, unlok: Unlok, task: Task
 ) -> Pod:
@@ -1205,7 +1335,7 @@ def _recreate(kabinet: Kabinet, unlok: Unlok, task: Task, ctx: DeployerContext, 
     return new_pod
 
 
-@app.action(effects=Effects.REPEATABLE)
+@app.action(effects=Effects.REPEATABLE, logo=REFRESH_LOGS_LOGO)
 def refresh_logs(pod: Pod, context: DeployerContext, kabinet: Kabinet) -> Pod:
     """Refresh Logs
 
@@ -1215,7 +1345,7 @@ def refresh_logs(pod: Pod, context: DeployerContext, kabinet: Kabinet) -> Pod:
     return pod
 
 
-@app.action(effects=Effects.REPEATABLE)
+@app.action(effects=Effects.REPEATABLE, logo=STOP_LOGO)
 def stop(pod: Pod, context: DeployerContext, kabinet: Kabinet) -> Pod:
     """Stop
 
@@ -1226,7 +1356,7 @@ def stop(pod: Pod, context: DeployerContext, kabinet: Kabinet) -> Pod:
     return pod
 
 
-@app.action(effects=Effects.REPEATABLE)
+@app.action(effects=Effects.REPEATABLE, logo=RESTART_LOGO)
 def restart(pod: Pod, context: DeployerContext, kabinet: Kabinet) -> Pod:
     """Restart
 
@@ -1238,7 +1368,7 @@ def restart(pod: Pod, context: DeployerContext, kabinet: Kabinet) -> Pod:
     return pod
 
 
-@app.action(effects=Effects.IRREVERSIBLE)
+@app.action(effects=Effects.IRREVERSIBLE, logo=REAUTHORIZE_LOGO)
 def reauthorize(
     pod: Pod, context: DeployerContext, kabinet: Kabinet, unlok: Unlok, task: Task
 ) -> Pod:
@@ -1250,7 +1380,7 @@ def reauthorize(
     return _recreate(kabinet, unlok, task, context, pod, _container_of(context, pod))
 
 
-@app.action(effects=Effects.REPEATABLE)
+@app.action(effects=Effects.REPEATABLE, logo=REMOVE_LOGO)
 def remove(pod: Pod, context: DeployerContext, kabinet: Kabinet, unlok: Unlok) -> Pod:
     """Remove
 
@@ -1291,7 +1421,7 @@ def _await_enrolled(
         koil.sleep(2)
 
 
-@app.action(effects=Effects.IRREVERSIBLE)
+@app.action(effects=Effects.IRREVERSIBLE, logo=UPGRADE_LOGO)
 def upgrade(
     pod: Pod, context: DeployerContext, kabinet: Kabinet, unlok: Unlok, task: Task
 ) -> Pod:

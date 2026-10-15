@@ -607,3 +607,14 @@ def test_a_cancelled_upgrade_stops_waiting(monkeypatch):
         D._await_enrolled(
             kabinet, SimpleNamespace(), FakeTask(cancel_after=3), make_ctx(FakeDocker()), make_pod("new"), timeout=60
         )
+
+
+def test_the_app_and_every_action_have_a_logo():
+    """The engine's logo is its default, and each action is drawn by an action logo it declares."""
+    declaration = D.app.registry.to_implement_agent_input().model_dump(mode="json", exclude_none=True)
+    bloks = {blok["key"]: blok for blok in declaration["bloks"]}
+    assert [key for key, blok in bloks.items() if blok.get("default")] == ["plugin_engine_logo"]
+    assert bloks["plugin_engine_logo"]["context"] == "LOGO"
+    logos = [implementation.get("logo") for implementation in declaration["implementations"]]
+    assert None not in logos
+    assert {bloks[logo]["context"] for logo in logos} == {"ACTION_LOGO"}
