@@ -8,7 +8,7 @@ authors = [
 ]
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "arkitekt[all]>=6.7.1",
+    "arkitekt[all]>=7.0.0",
     # Pages through a backend's pods (MyPods) and reads a pod that may be gone (myPodAt).
     "kabinet>=5.2.0",
     "docker",

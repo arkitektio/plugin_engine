@@ -4,8 +4,8 @@ A kabinet backend that runs approved app releases as Docker containers.
 
 The engine registers one backend and one resource: the host of the Docker daemon it is
 given. A user approves a release in the UI. The engine then places the release's
-best-fitting flavour, image by digest only. It hands the container a single-use redeem
-token, provisioned under the approver's mandate. Each container is reported to kabinet as
+best-fitting flavour, image by digest only. It hands the container a mandate key of its
+own, issued under the approver's mandate. Each container is reported to kabinet as
 a pod, and a sweep keeps containers and pods in step. The module docstring in `app.py`
 has the whole contract.
 
@@ -18,11 +18,15 @@ the socket. Konstruktor runs one beside a hub, or as a standalone engine.
 ```sh
 docker run -d --restart unless-stopped \
   -v /var/run/docker.sock:/var/run/docker.sock \
-  -e FAKTS_URL=https://your.hub -e FAKTS_REDEEM_TOKEN=... \
+  -e FAKTS_URL=https://your.hub -e FAKTS_MANDATE_KEY=... \
   -e KABINET_DEPLOYER_ID=my-host -e ARKITEKT_DEVICE_ID=my-host \
   -e ARKITEKT_GATEWAY=https://your.hub -e ARKITEKT_NETWORK=your_network \
   ghcr.io/arkitektio/plugin_engine:<version>-vanilla arkitekt run prod
 ```
+
+`FAKTS_MANDATE_KEY` is the engine's own login: a mandate key for `plugin_engine`, issued by
+a member of the organization (in kontrol, or from a hub's configuration). The engine signs
+in as that member.
 
 Set `KABINET_DEPLOYER_ID` and `ARKITEKT_DEVICE_ID` to values that outlive the container.
 Their defaults are derived from the container itself. When those change, every plugin the

@@ -8,27 +8,27 @@ server stores selectors but deliberately does not evaluate them, see the server'
 Approvals and credentials
 -------------------------
 The deployer installs only what a user pre-approved. Approving a release in the UI
-creates a lok **mandate** (the user lets this deployer app provision that exact release
-*as them*) and a kabinet **release approval** pointing at it, pinned to the release's
-digest. Every install names an approval; kabinet refuses a deployment whose approval is
+creates a lok agent **mandate** (the user lets this deployer app issue keys that run that
+exact release *as them*) and a kabinet **release approval** pointing at it, pinned to the
+release's digest. Every install names an approval; kabinet refuses a deployment whose approval is
 revoked, stale (the release was re-published differently) or not meant for this backend.
 
-A container never receives a long-lived credential. Right before ``docker run`` the
-deployer asks lok to ``provision`` under the mandate: a **single-use redeem token issued
-to the approver**, pinned to the approved identifier, version, scopes and requirements
-and to a device id unique to this container (instances on one host would otherwise
-replace each other's client). The container redeems it on start (``arkitekt run prod``
-reads ``FAKTS_REDEEM_TOKEN``) and from then on lives on its rotating refresh chain,
-acting as the approver. Once the pod is running the monitor confirms that the client the
-token produced is the approved app and records its client id on the pod. Removing a pod
-releases its client on lok; revoking the mandate deletes every client it produced.
+Right before ``docker run`` the deployer issues a **mandate key** for the container under
+the approval's mandate (``issueChildMandateKey``): a child mandate of the approver's,
+pinned to the approved identifier, version, scopes and requirements and to a device id
+unique to this container (instances on one host would otherwise share a client). The
+container logs in with it (``arkitekt run prod`` reads ``FAKTS_MANDATE_KEY``) and runs the
+grant again whenever its access token expires, acting as the approver; lok checks the pin
+and the mandate at every login. Once the app has logged in the monitor records its client
+id on the pod. Removing a pod revokes its key, which deletes its client; revoking the
+approval's mandate revokes every key issued under it.
 
 State
 -----
 Every container belongs to a pod that exists before it: the deployer registers the pod
 under a local id it chooses, then starts the container carrying that id as a label. The
 server's pod (``status``, ``client_id``) is the record of what has been reported and
-verified; the container labels carry the pod, deployment, flavour and token ids.
+verified; the container labels carry the pod, deployment, flavour and key's mandate ids.
 
 Docker events only update statuses. Removing and settling is the sweep's alone: every
 ``DEPLOYER_RECONCILE_SECONDS`` (and at start, which re-adopts what a previous run left
@@ -62,7 +62,6 @@ Configuration (environment)
                                requesting a scope outside it is refused (unset: allow all)
 ``DEPLOYER_ACCEPT_APPROVERS``  comma list of user subs whose approvals this host runs
                                (unset: any member of the organization)
-``DEPLOYER_TOKEN_TTL_MINUTES`` lifetime of a provisioned redeem token (default: 60)
 ``DEPLOYER_RECONCILE_SECONDS`` full container sweep interval behind the event stream (60)
 ``DEPLOYER_ORPHAN_GRACE_SECONDS`` how long a container without a pod, or a pod without a
                                container, is left alone before the sweep acts on it (120)
@@ -83,7 +82,7 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Iterable
+from typing import Annotated, Any, Iterable
 
 import docker
 import docker.errors
@@ -94,9 +93,11 @@ from docker.models.containers import Container
 from docker.utils import parse_repository_tag
 from koil.errors import ThreadCancelledError
 
-from arkitekt import App, Effects, run
+from arkitekt import App, DescriptorOperator, Effects, Requires, run
 from arkitekt.device_id import get_or_set_device_id
 from kabinet import Kabinet
+from rekuest.api.schema import Agent
+from rekuest.arkitekt import SUPERVISOR, rekuest_service
 from kabinet import kabinet_service
 from kabinet.api.schema import (
     Backend,
@@ -116,7 +117,7 @@ from arkitekt import LogLevel
 from arkitekt import Task
 from unlok import Unlok
 from unlok import unlok_service
-from unlok.api.schema import ProvisionedToken
+from unlok.api.schema import IssuedMandateKey
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +125,7 @@ logger = logging.getLogger(__name__)
 __version__ = "1.1.0"
 
 AGENT_IDENTIFIER = "plugin_engine"
-"""The app identifier a mandate must name for this deployer to provision under it."""
+"""The app identifier a mandate must name for this deployer to issue keys under it."""
 
 app = App(
     AGENT_IDENTIFIER,
@@ -132,7 +133,7 @@ app = App(
     author="jhnnsrs",
     scopes=["read", "write"],
     description="Runs approved app releases as Docker containers on this host.",
-    services=[kabinet_service, unlok_service],
+    services=[kabinet_service, unlok_service, rekuest_service],
 )
 
 # --- logos ------------------------------------------------------------------------
@@ -242,9 +243,16 @@ RESTART_LOGO = _action_logo(
     + '<G animate="spin"><Path d="M20.5 12a8.5 8.5 0 1 1-2.5-6" stroke="brand-strong" strokeWidth="2" />'
     + '<Path d="M18.5 2v4h-4" stroke="brand-strong" strokeWidth="2" /></G>',
 )
+START_LOGO = _action_logo(
+    "plugin_engine_start_logo",
+    "Start a stopped container",
+    _container(2.5, 5, 15, 11)
+    + '<Circle cx="17.5" cy="17.5" r="5" fill="surface" />'
+    + '<Path d="M16 15.2v4.6l3.8-2.3z" fill="brand-strong" stroke="none" animate="pulse" />',
+)
 REAUTHORIZE_LOGO = _action_logo(
     "plugin_engine_reauthorize_logo",
-    "Give a pod a fresh token",
+    "Give a pod a fresh key",
     '<Path d="M3.5 8.5A9.5 9.5 0 0 1 19 5.5" stroke="brand-strong" animate="draw" />'
     + '<Path d="M19.6 2.2v3.6H16" stroke="brand-strong" />'
     + '<Circle cx="7.5" cy="15" r="4" fill="brand-soft" />'
@@ -279,7 +287,6 @@ _allowed = {s.strip() for s in os.getenv("DEPLOYER_ALLOWED_SCOPES", "").split(",
 ALLOWED_SCOPES: frozenset[str] | None = frozenset(_allowed) if _allowed else None
 _approvers = {s.strip() for s in os.getenv("DEPLOYER_ACCEPT_APPROVERS", "").split(",") if s.strip()}
 ACCEPT_APPROVERS: frozenset[str] | None = frozenset(_approvers) if _approvers else None
-TOKEN_TTL_MINUTES = int(os.getenv("DEPLOYER_TOKEN_TTL_MINUTES", "60"))
 RECONCILE_SECONDS = float(os.getenv("DEPLOYER_RECONCILE_SECONDS", "60"))
 ORPHAN_GRACE_SECONDS = float(os.getenv("DEPLOYER_ORPHAN_GRACE_SECONDS", "120"))
 UPGRADE_WAIT_SECONDS = float(os.getenv("DEPLOYER_UPGRADE_WAIT_SECONDS", "300"))
@@ -293,8 +300,8 @@ LABEL_APP = f"{LABEL}.app"
 LABEL_VERSION = f"{LABEL}.version"
 LABEL_APPROVAL = f"{LABEL}.approval"
 LABEL_INSTANCE = f"{LABEL}.instance_device"
-LABEL_TOKEN = f"{LABEL}.redeem_token"
-LABEL_TOKEN_ISSUED = f"{LABEL}.redeem_token_issued_at"
+#: The child mandate whose key the container logs in with; revoking it retires the app.
+LABEL_KEY_MANDATE = f"{LABEL}.key_mandate"
 
 RESTART_POLICY = {"Name": "on-failure", "MaximumRetryCount": 5}
 LOG_TAIL = 200
@@ -553,7 +560,7 @@ def _check_mandate(unlok: Unlok, approval: ReleaseApproval) -> None:
         mandate = unlok.get_mandate(approval.mandate_id)
     except Exception as e:  # noqa: BLE001 — revoked mandates stay readable; missing ones do not
         raise PlacementError(f"The mandate behind the approval of {name} cannot be read: {e}") from e
-    subject = mandate.subject_manifest if isinstance(mandate.subject_manifest, dict) else {}
+    subject = mandate.subject
     problems = []
     if not mandate.is_live:
         problems.append("it is revoked or expired")
@@ -561,8 +568,8 @@ def _check_mandate(unlok: Unlok, approval: ReleaseApproval) -> None:
         problems.append(f"it names the agent '{mandate.agent_identifier}'")
     if str(mandate.grantor.id) != str(approval.approver.sub):
         problems.append("it was granted by someone other than the approver")
-    if (subject.get("identifier"), subject.get("version")) != (release.app.identifier, release.version):
-        problems.append(f"it is for {subject.get('identifier')}:{subject.get('version')}")
+    if (subject.identifier, subject.version) != (release.app.identifier, release.version):
+        problems.append(f"it is for {subject.identifier}:{subject.version}")
     if mandate.attestation != approval.digest:
         problems.append("it attests a different release digest")
     if problems:
@@ -756,87 +763,54 @@ def _discard(container: Container) -> None:
         logger.warning("could not remove %s: %s", container.name, e)
 
 
-def _release_client(unlok: Unlok, pod: Pod) -> None:
-    """Retire the pod's lok client so it stops counting against the mandate."""
-    if not pod.client_id:
+def _revoke_key(unlok: Unlok, mandate_id: str | None) -> None:
+    """Revoke a container's key: lok deletes the client it logged in, and it can never
+    log in again. Never the approval's mandate, only the child issued for the container."""
+    if not mandate_id:
         return
     try:
-        unlok.release_mandate_client(pod.client_id)
+        unlok.revoke_mandate(mandate_id)
     except ThreadCancelledError:
         raise
-    except Exception as e:  # noqa: BLE001 — already gone (mandate revoked) is fine
-        logger.warning("could not release client %s: %s", pod.client_id, e)
-
-
-def _token_expired(token: ProvisionedToken, container: Container) -> bool:
-    """Whether the container's redeem token has lapsed: lok's own expiry, else issue + TTL."""
-    expires = token.expires_at
-    if expires is None:
-        try:
-            issued = datetime.datetime.fromisoformat(container.labels.get(LABEL_TOKEN_ISSUED, ""))
-        except ValueError:
-            return False
-        expires = issued + datetime.timedelta(minutes=TOKEN_TTL_MINUTES)
-    if expires.tzinfo is None:
-        expires = expires.replace(tzinfo=datetime.timezone.utc)
-    return datetime.datetime.now(datetime.timezone.utc) > expires
+    except Exception as e:  # noqa: BLE001 — already gone (its parent was revoked) is fine
+        logger.warning("could not revoke key mandate %s: %s", mandate_id, e)
 
 
 def _verify_credentials(
     kabinet: Kabinet, unlok: Unlok, ctx: DeployerContext, container: Container, pod: Pod
 ) -> None:
-    """Confirm the client the container's provisioned token produced.
+    """Record the client the container's key logged in.
 
-    Runs while the pod is RUNNING and has no ``client_id`` yet, so it is retried by
-    the next event or sweep until the container has redeemed. Two outcomes end the
-    pod, each with its reason in the pod's logs:
-
-    - the token lapsed unredeemed: the container is stopped (it can never enroll);
-    - the client enrolled as anything other than the approved release: it is released
-      on lok (its refresh chain dies) and the container removed.
+    Runs while the pod is RUNNING and has no ``client_id`` yet, so it is retried by the
+    next event or sweep until the app has logged in. There is nothing to check about
+    WHAT logged in: lok enforces the key's pin (the approved identifier, version, scopes,
+    requirements and this container's device id) at every login. One outcome ends the
+    pod, with its reason in the pod's logs: the key stopped working before the app
+    logged in (revoked, or its mandate expired), so it never can; the container is stopped.
     """
-    token_id = container.labels.get(LABEL_TOKEN)
-    if not token_id:
+    mandate_id = container.labels.get(LABEL_KEY_MANDATE)
+    if not mandate_id:
         return
     try:
-        token = unlok.mandate_token(token_id)
+        mandate = unlok.get_mandate(mandate_id)
     except ThreadCancelledError:
         raise
-    except Exception:  # noqa: BLE001 — the mandate was revoked (and its tokens with it)
-        logger.warning("%s: provisioned token %s is gone; cannot verify its client", container.name, token_id)
+    except Exception:  # noqa: BLE001 — retried on the next event / sweep
+        logger.warning("%s: its key mandate %s cannot be read; cannot record its client", container.name, mandate_id)
         return
-    if token.client is None:  # not redeemed yet
-        if _token_expired(token, container):
+    if not mandate.clients:  # not logged in yet
+        if not mandate.is_live:
             _fail(
                 kabinet,
                 pod.pod_id,
                 pod.id,
-                "The app did not redeem its credential before it expired, so it can never enroll. "
+                "The app's key was revoked or expired before it logged in, so it can never enroll. "
                 "Reauthorize the pod to give it a fresh one.",
                 container,
             )
             container.stop()
         return
-    if token.client.release is None:
-        # Redeemed, but lok does not say as what: nothing to verify against, and a
-        # credential that was redeemed has not lapsed. Retried by the next sweep.
-        logger.warning("%s: its client %s carries no release; cannot verify it yet", container.name, token.client.client_id)
-        return
-    flavour = pod.deployment.flavour
-    expected = (flavour.release.app.identifier, flavour.release.version)
-    actual = (token.client.release.app.identifier, token.client.release.version)
-    if expected != actual:
-        unlok.release_mandate_client(token.client.client_id)
-        _fail(
-            kabinet,
-            pod.pod_id,
-            pod.id,
-            f"The container enrolled as {actual[0]}:{actual[1]} but was approved for "
-            f"{expected[0]}:{expected[1]}. Its client was released and the container removed.",
-            container,
-        )
-        _discard(container)
-        return
+    client_id = mandate.clients[0].client_id
     deployment_id = container.labels.get(LABEL_DEPLOYMENT)
     if deployment_id:
         # create_pod upserts on (backend, pod_id): this only fills in the client id.
@@ -844,9 +818,9 @@ def _verify_credentials(
             deployment=deployment_id,
             local_id=pod.pod_id,
             resource=ctx.resource,
-            client_id=token.client.client_id,
+            client_id=client_id,
         )
-    logger.info("%s: verified as %s:%s (client %s)", container.name, *actual, token.client.client_id)
+    logger.info("%s: logged in as client %s", container.name, client_id)
 
 
 def _converge(kabinet: Kabinet, unlok: Unlok, ctx: DeployerContext, container: Container, pod: Pod) -> None:
@@ -1074,9 +1048,12 @@ def _instance_device_id(ctx: DeployerContext) -> str:
     return f"{ctx.device_id}:{uuid.uuid4().hex[:12]}"
 
 
-def _provision_token(unlok: Unlok, approval: ReleaseApproval, device_id: str) -> ProvisionedToken:
-    """A single-use redeem token for one container, issued to the approver by lok."""
-    return unlok.provision(mandate=approval.mandate_id, device_id=device_id, ttl_minutes=TOKEN_TTL_MINUTES)
+def _issue_key(unlok: Unlok, approval: ReleaseApproval, device_id: str) -> IssuedMandateKey:
+    """A mandate key for one container: a child of the approval's mandate, pinned to the
+    container's device id, acting as the approver. lok shows the key only here."""
+    return unlok.issue_child_mandate_key(
+        mandate=approval.mandate_id, device_id=device_id, label=f"{AGENT_IDENTIFIER} {device_id}"
+    )
 
 
 def _pull_image(task: Task, ctx: DeployerContext, image: str, start: int = 10, end: int = 60) -> None:
@@ -1108,13 +1085,12 @@ def _start_container(
     deployment_id: str,
     approval: ReleaseApproval,
     device_id: str,
-    token: ProvisionedToken,
+    key: IssuedMandateKey,
 ) -> Container:
     release = flavour.release
-    issued_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
     return ctx.docker.containers.run(
         flavour.image.image_string,
-        # The CLI reads FAKTS_REDEEM_TOKEN / FAKTS_URL itself; nothing secret on argv.
+        # The CLI reads FAKTS_MANDATE_KEY / FAKTS_URL itself; nothing secret on argv.
         command="arkitekt run prod",
         name=name,
         detach=True,
@@ -1130,15 +1106,16 @@ def _start_container(
             LABEL_VERSION: release.version,
             LABEL_APPROVAL: str(approval.id),
             LABEL_INSTANCE: device_id,
-            LABEL_TOKEN: str(token.id),
-            LABEL_TOKEN_ISSUED: issued_at,
+            LABEL_KEY_MANDATE: str(key.mandate.id),
         },
         environment={
-            "FAKTS_REDEEM_TOKEN": token.token,
+            "FAKTS_MANDATE_KEY": key.key,
             "FAKTS_URL": ctx.gateway,
-            # The token is pinned to this device id; the app puts it in its manifest.
+            # The key is pinned to this device id; the app puts it in its manifest.
             "ARKITEKT_DEVICE_ID": device_id,
             "ARKITEKT_HEADLESS": "1",
+            # The app states it on Register: pickers of this engine's agent actions narrow on it.
+            "ARKITEKT_SUPERVISOR": AGENT_IDENTIFIER,
             **({"FAKTS_ALLOW_INSECURE_TRANSPORT": INSECURE_TRANSPORT} if INSECURE_TRANSPORT else {}),
         },
         device_requests=_device_requests(flavour),
@@ -1152,7 +1129,7 @@ def _launch(
     deployment_id: str,
     approval: ReleaseApproval,
     device_id: str,
-    token: ProvisionedToken,
+    key: IssuedMandateKey,
     resource: Resource,
 ) -> tuple[Container, Pod]:
     """Register the pod, then start its container: pod first, container second.
@@ -1169,7 +1146,7 @@ def _launch(
     name = f"kabinet-{_slug(release.app.identifier)}-{_slug(release.version)}-{pod_key[:8]}"
     pod = kabinet.create_pod(deployment=deployment_id, local_id=pod_key, resource=resource)
     try:
-        container = _start_container(ctx, name, pod_key, flavour, deployment_id, approval, device_id, token)
+        container = _start_container(ctx, name, pod_key, flavour, deployment_id, approval, device_id, key)
     except Exception:
         for leftover in ctx.docker.containers.list(all=True, filters={"label": f"{LABEL_POD}={pod_key}"}):
             _discard(leftover)
@@ -1181,6 +1158,26 @@ def _launch(
             logger.warning("could not delete pod %s after a failed start: %s", pod_key, e)
         raise
     return container, pod
+
+
+def _launch_keyed(
+    kabinet: Kabinet,
+    unlok: Unlok,
+    ctx: DeployerContext,
+    flavour: Flavour,
+    deployment_id: str,
+    approval: ReleaseApproval,
+    device_id: str,
+    key: IssuedMandateKey,
+    resource: Resource,
+) -> tuple[Container, Pod]:
+    """``_launch``, revoking the key again if no container came of it: a key nobody runs
+    must not stay live."""
+    try:
+        return _launch(kabinet, ctx, flavour, deployment_id, approval, device_id, key, resource)
+    except Exception:
+        _revoke_key(unlok, str(key.mandate.id))
+        raise
 
 
 def _deploy_flavour(
@@ -1197,7 +1194,7 @@ def _deploy_flavour(
     _check_scopes(flavour)
     resource = _select_resource(ctx, flavour)
 
-    # Pull first: the provisioned token is short-lived and a pull can take a while.
+    # Pull first: no key is issued for an image this host cannot fetch.
     task.progress(5, f"Pulling {image}")
     _pull_image(task, ctx, image, start=5, end=55)
 
@@ -1206,12 +1203,12 @@ def _deploy_flavour(
         flavour=flavour, local_id=image, approval=approval.id, last_pulled=datetime.datetime.now()
     )
 
-    task.progress(65, "Provisioning a credential under the approval's mandate")
+    task.progress(65, "Issuing a key under the approval's mandate")
     device_id = _instance_device_id(ctx)
-    token = _provision_token(unlok, approval, device_id)
+    key = _issue_key(unlok, approval, device_id)
 
     task.progress(70, "Starting container")
-    container, pod = _launch(kabinet, ctx, flavour, deployment.id, approval, device_id, token, resource)
+    container, pod = _launch_keyed(kabinet, unlok, ctx, flavour, deployment.id, approval, device_id, key, resource)
 
     task.progress(100, f"Started {container.name}")
     logger.info("deployed %s as %s (pod %s, approval %s)", image, container.name, pod.id, approval.id)
@@ -1307,7 +1304,7 @@ def auto_install(
 
 
 def _recreate(kabinet: Kabinet, unlok: Unlok, task: Task, ctx: DeployerContext, pod: Pod, old: Container) -> Pod:
-    """Replace a container with one holding a freshly provisioned token.
+    """Replace a container with one holding a fresh key.
 
     Environment cannot be changed on an existing container, so this is a new container
     (and therefore a new pod) for the same deployment, under the same approval — which
@@ -1322,15 +1319,16 @@ def _recreate(kabinet: Kabinet, unlok: Unlok, task: Task, ctx: DeployerContext, 
     _check_approval(ctx, approval)
     _check_mandate(unlok, approval)
     resource = _select_resource(ctx, flavour)
-    task.progress(10, "Provisioning a fresh credential")
+    task.progress(10, "Issuing a fresh key")
     device_id = _instance_device_id(ctx)
-    token = _provision_token(unlok, approval, device_id)
+    key = _issue_key(unlok, approval, device_id)
     task.progress(40, f"Removing {old.name}")
+    old_key = old.labels.get(LABEL_KEY_MANDATE)
     old.remove(force=True)
-    _release_client(unlok, pod)
+    _revoke_key(unlok, old_key)
     kabinet.delete_pod(pod.id)
     task.progress(60, "Starting replacement container")
-    container, new_pod = _launch(kabinet, ctx, flavour, deployment_id, approval, device_id, token, resource)
+    container, new_pod = _launch_keyed(kabinet, unlok, ctx, flavour, deployment_id, approval, device_id, key, resource)
     task.progress(100, f"Replaced {old.name} with {container.name}")
     return new_pod
 
@@ -1345,27 +1343,101 @@ def refresh_logs(pod: Pod, context: DeployerContext, kabinet: Kabinet) -> Pod:
     return pod
 
 
+def _stop_pod(context: DeployerContext, kabinet: Kabinet, pod: Pod) -> Pod:
+    _container_of(context, pod).stop()
+    kabinet.update_pod(local_id=pod.pod_id, status=PodStatus.STOPPED)
+    return pod
+
+
+def _start_pod(context: DeployerContext, kabinet: Kabinet, pod: Pod) -> Pod:
+    _container_of(context, pod).start()
+    kabinet.update_pod(local_id=pod.pod_id, status=PodStatus.PENDING)
+    return pod
+
+
+def _restart_pod(context: DeployerContext, kabinet: Kabinet, pod: Pod) -> Pod:
+    _container_of(context, pod).restart()
+    kabinet.update_pod(local_id=pod.pod_id, status=PodStatus.PENDING)
+    return pod
+
+
 @app.action(effects=Effects.REPEATABLE, logo=STOP_LOGO)
 def stop(pod: Pod, context: DeployerContext, kabinet: Kabinet) -> Pod:
     """Stop
 
     Stops the container. The on-failure restart policy does not restart a clean stop.
     """
-    _container_of(context, pod).stop()
-    kabinet.update_pod(local_id=pod.pod_id, status=PodStatus.STOPPED)
-    return pod
+    return _stop_pod(context, kabinet, pod)
 
 
 @app.action(effects=Effects.REPEATABLE, logo=RESTART_LOGO)
 def restart(pod: Pod, context: DeployerContext, kabinet: Kabinet) -> Pod:
     """Restart
 
-    Restarts the container. It keeps its identity: the fakts cache inside the container
-    carries the refresh chain, so no new token is needed.
+    Restarts the container. It keeps its identity: it logs in again with the same key.
     """
-    _container_of(context, pod).restart()
-    kabinet.update_pod(local_id=pod.pod_id, status=PodStatus.PENDING)
-    return pod
+    return _restart_pod(context, kabinet, pod)
+
+
+# --- the apps, as agents ------------------------------------------------------------
+#
+# The same lifecycle, on the agent an app became: what a user sees of it in rekuest. An
+# app this engine starts states ARKITEKT_SUPERVISOR=plugin_engine on Register, which is
+# what the picker below narrows on. That is the app's own claim, so it decides nothing:
+# the agent is acted on only when its lok client is one this engine recorded on one of
+# its own pods, and only for a caller of that agent's organization.
+
+OwnAgent = Annotated[Agent, Requires(key=SUPERVISOR, operator=DescriptorOperator.EQUALS, value=AGENT_IDENTIFIER)]
+
+
+class NotMine(PlacementError):
+    """An agent that is not an app this engine runs, or a caller who may not act on it."""
+
+
+def _pod_of(kabinet: Kabinet, context: DeployerContext, agent: Agent) -> Pod:
+    """The pod of this engine whose verified lok client is the agent's."""
+    client_id = agent.client.client_id
+    for pod in _all_my_pods(kabinet, context):
+        if pod.client_id is not None and pod.client_id == client_id:
+            return pod
+    raise NotMine(f"{agent.name} is not an app this engine runs")
+
+
+def _check_caller(task: Task, agent: Agent) -> None:
+    """Only a caller of the agent's own organization may act on it."""
+    if task.org != agent.organization.slug:
+        raise NotMine(f"{agent.name} belongs to another organization than the caller's")
+
+
+@app.action(effects=Effects.REPEATABLE, logo=STOP_LOGO)
+def stop_app(agent: OwnAgent, context: DeployerContext, kabinet: Kabinet, task: Task) -> Pod:
+    """Stop App
+
+    Stops the container of an app this engine runs.
+    """
+    _check_caller(task, agent)
+    return _stop_pod(context, kabinet, _pod_of(kabinet, context, agent))
+
+
+@app.action(effects=Effects.REPEATABLE, logo=START_LOGO)
+def start_app(agent: OwnAgent, context: DeployerContext, kabinet: Kabinet, task: Task) -> Pod:
+    """Start App
+
+    Starts the stopped container of an app this engine runs. It comes back as the same
+    agent: it logs in again with the key it was started with.
+    """
+    _check_caller(task, agent)
+    return _start_pod(context, kabinet, _pod_of(kabinet, context, agent))
+
+
+@app.action(effects=Effects.REPEATABLE, logo=RESTART_LOGO)
+def restart_app(agent: OwnAgent, context: DeployerContext, kabinet: Kabinet, task: Task) -> Pod:
+    """Restart App
+
+    Restarts the container of an app this engine runs, keeping its identity.
+    """
+    _check_caller(task, agent)
+    return _restart_pod(context, kabinet, _pod_of(kabinet, context, agent))
 
 
 @app.action(effects=Effects.IRREVERSIBLE, logo=REAUTHORIZE_LOGO)
@@ -1374,8 +1446,8 @@ def reauthorize(
 ) -> Pod:
     """Reauthorize
 
-    Re-creates the container with a freshly provisioned token, for a pod whose refresh
-    chain has lapsed (stopped longer than the refresh window). Yields a new pod.
+    Re-creates the container with a fresh key, for a pod whose key was revoked or
+    expired. Yields a new pod.
     """
     return _recreate(kabinet, unlok, task, context, pod, _container_of(context, pod))
 
@@ -1384,14 +1456,15 @@ def reauthorize(
 def remove(pod: Pod, context: DeployerContext, kabinet: Kabinet, unlok: Unlok) -> Pod:
     """Remove
 
-    Removes the container, releases its lok client and deletes the pod.
+    Removes the container, revokes its key (lok deletes its client) and deletes the pod.
     """
     container = _find_container(context, pod.pod_id)
     if container is None:
-        logger.info("container of pod %s already gone", pod.pod_id)
+        # Without the container its key is unknown here; it dies with the approval's mandate.
+        logger.warning("container of pod %s already gone; its key stays until the approval is revoked", pod.pod_id)
     else:
         _discard(container)
-    _release_client(unlok, pod)
+        _revoke_key(unlok, container.labels.get(LABEL_KEY_MANDATE))
     kabinet.delete_pod(pod.id)
     return pod
 
@@ -1400,8 +1473,7 @@ def _await_enrolled(
     kabinet: Kabinet, unlok: Unlok, task: Task, ctx: DeployerContext, pod: Pod, timeout: float
 ) -> None:
     """Wait until ``pod``'s app has enrolled as what was approved (its ``client_id`` is
-    set), or raise. A running container is not enough: the app may still fail to redeem
-    or enroll as something else."""
+    set), or raise. A running container is not enough: the app may still fail to log in."""
     deadline = time.monotonic() + timeout
     while True:
         # A cancelled wait must stop here, before anything acts on its outcome.
@@ -1460,7 +1532,7 @@ def upgrade(
     old = _find_container(context, pod.pod_id)
     if old is not None:
         _discard(old)
-    _release_client(unlok, pod)
+        _revoke_key(unlok, old.labels.get(LABEL_KEY_MANDATE))
     kabinet.delete_pod(pod.id)
     return new_pod
 

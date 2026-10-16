@@ -65,6 +65,14 @@ class FakeContainer:
         self.stopped = True
         self.status = "exited"
 
+    def start(self):
+        self.stopped = False
+        self.status = "running"
+
+    def restart(self):
+        self.restarted = True
+        self.status = "running"
+
     def logs(self, tail=200):
         return b"last lines of the app"
 
@@ -355,62 +363,57 @@ def test_a_failure_is_not_overwritten_by_a_stop():
     assert kabinet.pods["a"].status == PodStatus.FAILED
 
 
-def token(client=None, expires_at=None):
-    return SimpleNamespace(client=client, expires_at=expires_at)
+def key_mandate(clients=(), is_live=True):
+    return SimpleNamespace(clients=tuple(SimpleNamespace(client_id=c) for c in clients), is_live=is_live)
 
 
-def test_a_credential_that_expired_unredeemed_fails_the_pod_and_stops_the_container():
-    container = FakeContainer("a", pod_key="a", **{D.LABEL_TOKEN: "t1"})
+def test_a_key_that_stopped_working_before_the_app_logged_in_fails_the_pod_and_stops_the_container():
+    container = FakeContainer("a", pod_key="a", **{D.LABEL_KEY_MANDATE: "m1"})
     kabinet = FakeKabinet([make_pod("a", client_id=None)])
-    past = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=1)
-    unlok = SimpleNamespace(mandate_token=lambda _id: token(expires_at=past))
+    unlok = SimpleNamespace(get_mandate=lambda _id: key_mandate(is_live=False))
 
     reconcile(kabinet, make_ctx(FakeDocker([container])), unlok=unlok)
 
     assert kabinet.pods["a"].status == PodStatus.FAILED
-    assert "did not redeem its credential" in kabinet.logs["pod-id-a"][-1]
+    assert "key was revoked or expired before it logged in" in kabinet.logs["pod-id-a"][-1]
     assert container.stopped
 
 
-def test_an_unredeemed_credential_within_its_lifetime_is_waited_for():
-    container = FakeContainer("a", pod_key="a", **{D.LABEL_TOKEN: "t1"})
+def test_an_app_that_has_not_logged_in_yet_is_waited_for():
+    container = FakeContainer("a", pod_key="a", **{D.LABEL_KEY_MANDATE: "m1"})
     kabinet = FakeKabinet([make_pod("a", client_id=None)])
-    future = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=10)
-    unlok = SimpleNamespace(mandate_token=lambda _id: token(expires_at=future))
+    unlok = SimpleNamespace(get_mandate=lambda _id: key_mandate())
 
     reconcile(kabinet, make_ctx(FakeDocker([container])), unlok=unlok)
 
     assert kabinet.pods["a"].status == PodStatus.RUNNING and not container.stopped
+    assert kabinet.pods["a"].client_id is None
 
 
-def test_a_redeemed_credential_that_cannot_be_verified_never_stops_the_app():
-    """A client whose release does not come back has redeemed: past the token's expiry
-    that is "cannot verify", never "never enrolled"."""
-    container = FakeContainer("a", pod_key="a", **{D.LABEL_TOKEN: "t1"})
+def test_the_client_a_key_logged_in_is_recorded_on_the_pod():
+    """lok enforces the key's pin at login, so whatever logged in is the approved app."""
+    container = FakeContainer("a", pod_key="a", **{D.LABEL_KEY_MANDATE: "m1", D.LABEL_DEPLOYMENT: "d"})
     kabinet = FakeKabinet([make_pod("a", client_id=None)])
-    past = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=1)
-    redeemed = SimpleNamespace(client_id="c1", release=None)
-    unlok = SimpleNamespace(mandate_token=lambda _id: token(client=redeemed, expires_at=past))
+    asked = []
+    unlok = SimpleNamespace(get_mandate=lambda id: asked.append(id) or key_mandate(clients=["c1"], is_live=False))
 
     reconcile(kabinet, make_ctx(FakeDocker([container])), unlok=unlok)
 
-    assert not container.stopped
-    assert kabinet.pods["a"].status == PodStatus.RUNNING
+    assert asked == ["m1"]
+    # Logged in once is enough: an expired key does not take a running app down.
+    assert kabinet.pods["a"].client_id == "c1" and not container.stopped
 
 
-def test_an_app_that_enrolled_as_something_else_is_released_and_removed():
-    container = FakeContainer("a", pod_key="a", **{D.LABEL_TOKEN: "t1", D.LABEL_DEPLOYMENT: "d"})
-    kabinet = FakeKabinet([make_pod("a", client_id=None, app=("approved", "1.0"))])
-    released = []
-    impostor = SimpleNamespace(client_id="c9", release=SimpleNamespace(app=SimpleNamespace(identifier="other"), version="6.6"))
-    unlok = SimpleNamespace(mandate_token=lambda _id: token(client=impostor), release_mandate_client=released.append)
+def test_an_unreadable_key_mandate_is_retried_later():
+    container = FakeContainer("a", pod_key="a", **{D.LABEL_KEY_MANDATE: "m1"})
+    kabinet = FakeKabinet([make_pod("a", client_id=None)])
 
-    reconcile(kabinet, make_ctx(FakeDocker([container])), unlok=unlok)
+    def unreadable(_id):
+        raise GraphQLException("lok is down")
 
-    assert released == ["c9"]
-    assert container.removed
-    assert kabinet.pods["a"].status == PodStatus.FAILED
-    assert "enrolled as other:6.6" in kabinet.logs["pod-id-a"][-1]
+    reconcile(kabinet, make_ctx(FakeDocker([container])), unlok=SimpleNamespace(get_mandate=unreadable))
+
+    assert kabinet.pods["a"].status == PodStatus.RUNNING and not container.stopped
 
 
 # --- launching: pod first, container second ------------------------------------------------
@@ -426,9 +429,12 @@ def launch(docker_client, kabinet, ctx=None):
         "deployment",
         SimpleNamespace(id="approval"),
         "dev",
-        SimpleNamespace(id="t", token="secret"),
+        KEY,
         SimpleNamespace(id="resource"),
     )
+
+
+KEY = SimpleNamespace(key="k" * 43, mandate=SimpleNamespace(id="m1"))
 
 
 def test_the_pod_exists_before_its_container_runs():
@@ -456,6 +462,54 @@ def test_a_container_that_cannot_start_takes_its_pod_with_it():
     assert all(c.removed for c in docker_client.all)
 
 
+def test_a_plugin_logs_in_with_its_mandate_key_and_carries_its_mandate():
+    docker_client = FakeDocker()
+
+    container, _ = launch(docker_client, FakeKabinet())
+
+    environment = docker_client.run_kwargs["environment"]
+    assert environment["FAKTS_MANDATE_KEY"] == KEY.key
+    assert environment["ARKITEKT_DEVICE_ID"] == "dev"
+    assert container.labels[D.LABEL_KEY_MANDATE] == "m1"
+    # The key is never on the command line.
+    assert KEY.key not in docker_client.run_kwargs.get("command", "")
+
+
+def test_a_key_nobody_runs_is_revoked():
+    docker_client = FakeDocker()
+    docker_client.run_error = docker.errors.APIError("could not select device driver")
+    revoked = []
+    unlok = SimpleNamespace(revoke_mandate=revoked.append)
+    release = SimpleNamespace(app=SimpleNamespace(identifier="app"), version="1.0")
+    flavour = SimpleNamespace(id="f", release=release, image=SimpleNamespace(image_string="app@sha256:abc"), selectors=[])
+
+    with pytest.raises(docker.errors.APIError):
+        D._launch_keyed(
+            FakeKabinet(),
+            unlok,
+            make_ctx(docker_client),
+            flavour,
+            "d",
+            SimpleNamespace(id="approval"),
+            "dev",
+            KEY,
+            SimpleNamespace(id="resource"),
+        )
+
+    assert revoked == ["m1"]
+
+
+def test_removing_a_pod_revokes_its_key():
+    container = FakeContainer("a", pod_key="a", **{D.LABEL_KEY_MANDATE: "m1"})
+    kabinet = FakeKabinet([make_pod("a")])
+    revoked = []
+
+    D.remove(make_pod("a"), make_ctx(FakeDocker([container])), kabinet, SimpleNamespace(revoke_mandate=revoked.append))
+
+    assert revoked == ["m1"] and container.removed
+    assert kabinet.pods == {}
+
+
 def test_a_plugin_joins_the_engines_network():
     docker_client = FakeDocker()
 
@@ -474,6 +528,12 @@ def test_a_plugin_logs_in_over_plain_http_only_where_the_engine_may(monkeypatch)
     monkeypatch.setattr(D, "INSECURE_TRANSPORT", "1")
     launch(docker_client, FakeKabinet())
     assert docker_client.run_kwargs["environment"]["FAKTS_ALLOW_INSECURE_TRANSPORT"] == "1"
+
+
+def test_a_plugin_names_the_engine_as_its_supervisor():
+    docker_client = FakeDocker()
+    launch(docker_client, FakeKabinet())
+    assert docker_client.run_kwargs["environment"]["ARKITEKT_SUPERVISOR"] == D.AGENT_IDENTIFIER
 
 
 def test_a_network_mode_replaces_the_network():
@@ -558,6 +618,9 @@ def test_the_engine_offers_its_actions_as_plugin_engine():
         "reauthorize",
         "remove",
         "upgrade",
+        "stop_app",
+        "start_app",
+        "restart_app",
     } <= set(D.app.registry.implementations)
 
 
@@ -618,3 +681,90 @@ def test_the_app_and_every_action_have_a_logo():
     logos = [implementation.get("logo") for implementation in declaration["implementations"]]
     assert None not in logos
     assert {bloks[logo]["context"] for logo in logos} == {"ACTION_LOGO"}
+
+
+# --- the apps, as agents ----------------------------------------------------------------------
+
+
+def make_agent(client_id="client", org="lab"):
+    return SimpleNamespace(
+        name=f"agent of {client_id}",
+        client=SimpleNamespace(client_id=client_id),
+        organization=SimpleNamespace(slug=org),
+    )
+
+
+def test_an_agent_is_acted_on_through_the_pod_its_client_was_verified_on():
+    kabinet = FakeKabinet([make_pod("a", client_id="client-a"), make_pod("b", client_id="client-b")])
+
+    assert D._pod_of(kabinet, make_ctx(FakeDocker()), make_agent("client-b")).pod_id == "b"
+
+
+def test_an_agent_this_engine_does_not_run_is_refused():
+    """It may claim this engine as its supervisor; only a pod this engine verified counts."""
+    kabinet = FakeKabinet([make_pod("a", client_id="client-a"), make_pod("unverified", client_id=None)])
+
+    with pytest.raises(D.NotMine, match="not an app this engine runs"):
+        D._pod_of(kabinet, make_ctx(FakeDocker()), make_agent("someone-else"))
+
+
+def test_only_a_caller_of_the_agents_organization_may_act_on_it():
+    D._check_caller(SimpleNamespace(org="lab"), make_agent(org="lab"))
+    with pytest.raises(D.NotMine, match="another organization"):
+        D._check_caller(SimpleNamespace(org="elsewhere"), make_agent(org="lab"))
+
+
+def test_stopping_starting_and_restarting_an_app_act_on_its_container():
+    container = FakeContainer("c1", pod_key="a")
+    docker_client = FakeDocker([container])
+    kabinet = FakeKabinet([make_pod("a", client_id="client-a")])
+    ctx, agent, task = make_ctx(docker_client), make_agent("client-a"), SimpleNamespace(org="lab")
+
+    D.stop_app(agent, ctx, kabinet, task)
+    assert container.stopped and kabinet.pods["a"].status == PodStatus.STOPPED
+
+    D.start_app(agent, ctx, kabinet, task)
+    assert not container.stopped and kabinet.pods["a"].status == PodStatus.PENDING
+
+    D.restart_app(agent, ctx, kabinet, task)
+    assert container.restarted and kabinet.pods["a"].status == PodStatus.PENDING
+
+
+def test_the_agent_actions_ask_their_picker_for_this_engines_apps():
+    """The port narrows on the agent's self-declared supervisor; it decides nothing."""
+    declaration = D.app.registry.to_implement_agent_input().model_dump(mode="json", exclude_none=True)
+    implementations = {i["interface"]: i for i in declaration["implementations"]}
+    for interface in ("stop_app", "start_app", "restart_app"):
+        (agent,) = [a for a in implementations[interface]["definition"]["args"] if a["key"] == "agent"]
+        assert agent["identifier"] == "@rekuest/agent"
+        assert agent["requires"] == [{"key": "@rekuest/supervisor", "operator": "EQUALS", "value": "plugin_engine"}]
+
+
+# --- the mandate behind an approval -----------------------------------------------------------
+
+
+def approval_for(identifier="app", version="1.0", digest="sha256:d", approver="u1"):
+    release = SimpleNamespace(app=SimpleNamespace(identifier=identifier), version=version)
+    return SimpleNamespace(mandate_id="parent", release=release, digest=digest, approver=SimpleNamespace(sub=approver))
+
+
+def parent_mandate(**over):
+    mandate = dict(
+        is_live=True,
+        agent_identifier=D.AGENT_IDENTIFIER,
+        grantor=SimpleNamespace(id="u1"),
+        subject=SimpleNamespace(identifier="app", version="1.0"),
+        attestation="sha256:d",
+    )
+    mandate.update(over)
+    return SimpleNamespace(**mandate)
+
+
+def test_an_approval_backed_by_its_own_mandate_passes():
+    D._check_mandate(SimpleNamespace(get_mandate=lambda _id: parent_mandate()), approval_for())
+
+
+def test_an_approval_borrowing_another_mandate_is_refused():
+    other = parent_mandate(subject=SimpleNamespace(identifier="other", version="2.0"), attestation="sha256:x")
+    with pytest.raises(D.PlacementError, match="it is for other:2.0; it attests a different release digest"):
+        D._check_mandate(SimpleNamespace(get_mandate=lambda _id: other), approval_for())
