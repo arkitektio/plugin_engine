@@ -5,9 +5,15 @@ name: Release
 # them it raises the app's version in app.py, commits and tags that (v1.2.3), and the
 # commit is published as that release. Any other push publishes the latest build of the
 # main channel.
+#
+# A version tag pushed by hand (vX.Y.Z) is published as that release too, without
+# semantic-release. It is the way out when semantic-release could commit a version but
+# not push its tag: push the tag yourself. A tag semantic-release pushes starts no run of
+# its own (GitHub never does for the workflow's token), so nothing is published twice.
 on:
   push:
     branches: [main]
+    tags: ["v*"]
 
 # One release at a time: the next push waits for the version this one may commit.
 concurrency: release-${{ github.ref }}
@@ -30,6 +36,7 @@ jobs:
         run: uv run pytest
       - name: Version
         id: version
+        if: github.ref_type == 'branch'
         env:
           GH_TOKEN: ${{ github.token }}
         run: uvx --from "python-semantic-release>=10,<11" semantic-release version
@@ -37,4 +44,5 @@ jobs:
         with:
           target: app
           # The commit semantic-release tagged is that release, not a build of the branch.
+          # On a tag's own push it is empty: the tag is the release.
           release: ${{ steps.version.outputs.released }}
