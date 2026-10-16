@@ -2,6 +2,20 @@
 
 <!-- version list -->
 
+## v2.0.0 (2026-10-16)
+
+### Features
+
+- Run apps on mandate keys, and act on them as agents
+  ([`c225fdc`](https://github.com/arkitektio/plugin_engine/commit/c225fdc256deea2dcd9ae78ebcd3086d924d43fb))
+
+### Breaking Changes
+
+- The engine itself logs in with FAKTS_MANDATE_KEY (a key for plugin_engine issued by a member), not
+  FAKTS_REDEEM_TOKEN. DEPLOYER_TOKEN_TTL_MINUTES is gone. Pods started under redeem tokens were
+  signed out by lok's migration and need installing again.
+
+
 ## v1.1.0 (2026-10-15)
 
 ### Bug Fixes
