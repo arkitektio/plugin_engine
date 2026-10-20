@@ -16,3 +16,7 @@ platforms:
 - linux/amd64
 - linux/arm64
 selectors: []
+capabilities:
+- kind: container_engine
+  name: engine
+  description: Starts and stops the apps the organization installs, as containers on this machine
