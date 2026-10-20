@@ -41,15 +41,17 @@ Running in a container
 The engine needs the Docker socket, so it is not installed through kabinet: whoever runs
 it (konstruktor, beside a hub) mounts the socket and sets the environment below. Two
 values must then be set, because their defaults change whenever the container is
-recreated: ``KABINET_DEPLOYER_ID`` (the hostname is the container id, and every plugin
+recreated: ``ARKITEKT_INSTANCE_ID`` (the hostname is the container id, and every plugin
 labelled with the old one would be taken for someone else's) and ``ARKITEKT_DEVICE_ID``.
+konstruktor sets both for every app it attaches.
 The host is described from ``docker info``, which is the daemon's host. GPUs are read
 with ``nvidia-smi``, and where the engine's own image has none, inside a throwaway
 container the NVIDIA runtime hands it to.
 
 Configuration (environment)
 ---------------------------
-``KABINET_DEPLOYER_ID``        label value that marks containers as ours (default: hostname)
+``ARKITEKT_INSTANCE_ID``       label value that marks containers as ours (default:
+                               ``KABINET_DEPLOYER_ID``, then the hostname)
 ``ARKITEKT_GATEWAY``           the fakts URL handed to containers (default: go.arkitekt.live)
 ``ARKITEKT_NETWORK``           docker network containers join (default: next_default)
 ``FAKTS_ALLOW_INSECURE_TRANSPORT`` lets the engine log in over plain HTTP, and is passed on
@@ -275,7 +277,11 @@ UPGRADE_LOGO = _action_logo(
 
 # --- configuration ------------------------------------------------------------
 
-DEPLOYER_ID = os.getenv("KABINET_DEPLOYER_ID", socket.gethostname())
+DEPLOYER_ID = (
+    os.getenv("ARKITEKT_INSTANCE_ID")
+    or os.getenv("KABINET_DEPLOYER_ID")
+    or socket.gethostname()
+)
 ARKITEKT_GATEWAY = os.getenv("ARKITEKT_GATEWAY", "https://go.arkitekt.live")
 ARKITEKT_NETWORK = os.getenv("ARKITEKT_NETWORK", "next_default")
 ARKITEKT_NETWORK_MODE = os.getenv("ARKITEKT_NETWORK_MODE") or None
