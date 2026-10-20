@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v2.1.0 (2026-10-20)
+
+### Features
+
+- The engine declares the container engine it needs, for an installer to grant
+  ([`fc47095`](https://github.com/arkitektio/plugin_engine/commit/fc47095521d0db83597f90a6cc97265c040edba0))
+
+
 ## v2.0.0 (2026-10-16)
 
 ### Features
