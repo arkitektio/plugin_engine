@@ -95,11 +95,14 @@ from docker.models.containers import Container
 from docker.utils import parse_repository_tag
 from koil.errors import ThreadCancelledError
 
-from arkitekt import App, DescriptorOperator, Effects, Requires, run
+from arkitekt import App, AssignPrompt, DeniedError, DescriptorOperator, Effects, Requires, run
 from arkitekt.device_id import get_or_set_device_id
 from kabinet import Kabinet
 from rekuest.api.schema import Agent
 from rekuest.arkitekt import SUPERVISOR, rekuest_service
+from rekuest.client.client import Rekuest
+from rekuest.protocol.schema import ImplementationAgentFilter, ImplementationFilter, OffsetPaginationInput
+from kabinet.callers import REQUEST_APPROVAL
 from kabinet import kabinet_service
 from kabinet.api.schema import (
     Backend,
@@ -592,6 +595,37 @@ def _usable_approvals(kabinet: Kabinet, ctx: "DeployerContext") -> list[ReleaseA
             continue
         usable.append(approval)
     return usable
+
+
+def _approval_from_callers(rekuest: Rekuest, task: Task, release: Any) -> ReleaseApproval:
+    """Ask whoever called this task to approve ``release`` for this engine.
+
+    Only a person can approve (a lok mandate is theirs to grant), so the engine asks the app
+    they called it from: the nearest caller offering ``REQUEST_APPROVAL`` (orkestrator, when
+    it is engaged). The call is an ordinary child: unless the run is in auto-mode, the person
+    first agrees to be asked. What comes back is checked like any other approval.
+    """
+    name = f"{release.app.identifier}:{release.version}"
+    callers = rekuest.list_implementations(
+        filters=ImplementationFilter(
+            agent=ImplementationAgentFilter(caller_of=task.id), action_demand=REQUEST_APPROVAL, active=True
+        ),
+        pagination=OffsetPaginationInput(limit=1, offset=0),
+    )
+    if not callers:
+        raise PlacementError(
+            f"{name} is not approved for {AGENT_IDENTIFIER}, and nothing that called this can ask for it: "
+            "approve it in orkestrator, then install again."
+        )
+    prompt = AssignPrompt(
+        title=f"Approve {name}",
+        description=f"{AGENT_IDENTIFIER} needs your approval to run {name}; it then acts as you.",
+    )
+    try:
+        return task.call(callers[0], str(release.id), AGENT_IDENTIFIER, prompt=prompt)
+    except DeniedError as denied:
+        said = f": {denied.answer}" if denied.answer else "."
+        raise PlacementError(f"Approving {name} was declined{said}") from denied
 
 
 # --- context, health & startup ----------------------------------------------------------
@@ -1275,12 +1309,13 @@ def deploy_flavour(
 
 @app.action(effects=Effects.IRREVERSIBLE, logo=AUTO_INSTALL_LOGO)
 def auto_install(
-    definition: Definition, context: DeployerContext, kabinet: Kabinet, unlok: Unlok, task: Task
+    definition: Definition, context: DeployerContext, kabinet: Kabinet, unlok: Unlok, rekuest: Rekuest, task: Task
 ) -> Pod:
     """Auto Install
 
     Finds the newest approved flavour that provides the definition and can be placed
-    on this host, and deploys it.
+    on this host, and deploys it. When none is approved, asks the app it was called
+    from to have the newest placeable one approved.
     """
     flavours = kabinet.list_flavours(
         filters=FlavourFilter(has_definitions=[definition.id]),
@@ -1289,12 +1324,8 @@ def auto_install(
     if not flavours:
         raise PlacementError(f"No flavour provides definition '{definition.name}'.")
     approvals = {a.release.id: a for a in _usable_approvals(kabinet, context)}
+    unapproved: Flavour | None = None
     for flavour in flavours:
-        full = kabinet.get_flavour(flavour.id)
-        approval = approvals.get(full.release.id)
-        if approval is None:
-            logger.info("skipping flavour %s: its release has no usable approval", flavour.name)
-            continue
         try:
             _check_image(flavour)
             _check_scopes(flavour)
@@ -1302,8 +1333,17 @@ def auto_install(
         except PlacementError as e:
             logger.info("skipping flavour %s: %s", flavour.name, e)
             continue
+        full = kabinet.get_flavour(flavour.id)
+        approval = approvals.get(full.release.id)
+        if approval is None:
+            logger.info("skipping flavour %s for now: its release has no usable approval", flavour.name)
+            unapproved = unapproved or full
+            continue
         return _deploy_flavour(kabinet, unlok, task, context, full, approval)
-    raise PlacementError(f"No approved flavour providing '{definition.name}' can be placed on this host.")
+    if unapproved is not None:
+        approval = _approval_from_callers(rekuest, task, unapproved.release)
+        return _deploy_flavour(kabinet, unlok, task, context, unapproved, approval)
+    raise PlacementError(f"No flavour providing '{definition.name}' can be placed on this host.")
 
 
 # --- lifecycle ------------------------------------------------------------------------------

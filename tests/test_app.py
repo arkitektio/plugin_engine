@@ -768,3 +768,96 @@ def test_an_approval_borrowing_another_mandate_is_refused():
     other = parent_mandate(subject=SimpleNamespace(identifier="other", version="2.0"), attestation="sha256:x")
     with pytest.raises(D.PlacementError, match="it is for other:2.0; it attests a different release digest"):
         D._check_mandate(SimpleNamespace(get_mandate=lambda _id: other), approval_for())
+
+
+# --- an unapproved release is approved by whoever called the engine ---------------------------
+
+
+class CallerTask:
+    """A task whose children are answered here: the approval a caller hands back, or a refusal."""
+
+    id = "task-7"
+
+    def __init__(self, approval=None, deny=None):
+        self.approval = approval
+        self.deny = deny
+        self.calls = []
+
+    def progress(self, *_args):
+        pass
+
+    def call(self, target, *args, prompt=None):
+        self.calls.append((target, args, prompt))
+        if self.deny is not None:
+            raise D.DeniedError(self.deny, task="9")
+        return self.approval
+
+
+class CallerRekuest:
+    def __init__(self, implementations=()):
+        self.implementations = list(implementations)
+        self.asked = []
+
+    def list_implementations(self, filters, pagination):
+        self.asked.append(filters)
+        return tuple(self.implementations)
+
+
+def flavour(name, release_id):
+    release = SimpleNamespace(id=release_id, version="1.0", app=SimpleNamespace(identifier="segmenter"))
+    return SimpleNamespace(id=f"flavour-{name}", name=name, release=release)
+
+
+def auto_install(monkeypatch, rekuest, task, approvals=()):
+    flavours = [flavour("new", "r2"), flavour("old", "r1")]
+    kabinet = SimpleNamespace(
+        list_flavours=lambda filters, ordering: flavours,
+        get_flavour=lambda id: next(f for f in flavours if f.id == id),
+    )
+    deployed = []
+    monkeypatch.setattr(D, "_usable_approvals", lambda _k, _c: list(approvals))
+    for check in ("_check_image", "_check_scopes"):
+        monkeypatch.setattr(D, check, lambda _f: None)
+    monkeypatch.setattr(D, "_select_resource", lambda _c, _f: None)
+    monkeypatch.setattr(D, "_deploy_flavour", lambda _k, _u, _t, _c, f, a: deployed.append((f.name, a)) or "pod")
+    definition = SimpleNamespace(id="d1", name="segment")
+    pod = D.auto_install.__wrapped__(definition, make_ctx(FakeDocker()), kabinet, SimpleNamespace(), rekuest, task)
+    return pod, deployed
+
+
+def test_an_approved_flavour_is_installed_without_asking_anyone(monkeypatch):
+    rekuest, task = CallerRekuest(), CallerTask()
+    approved = SimpleNamespace(release=SimpleNamespace(id="r1"))
+
+    _, deployed = auto_install(monkeypatch, rekuest, task, approvals=[approved])
+
+    assert deployed == [("old", approved)]
+    assert rekuest.asked == [] and task.calls == []
+
+
+def test_without_an_approval_the_engine_asks_its_caller_and_installs_with_what_comes_back(monkeypatch):
+    window = SimpleNamespace(id="impl-ui")
+    approval = SimpleNamespace(release=SimpleNamespace(id="r2"))
+    rekuest, task = CallerRekuest([window]), CallerTask(approval=approval)
+
+    _, deployed = auto_install(monkeypatch, rekuest, task)
+
+    [filters] = rekuest.asked
+    assert filters.agent.caller_of == "task-7"
+    assert filters.action_demand == D.REQUEST_APPROVAL and filters.active is True
+    [(target, args, prompt)] = task.calls
+    assert target is window and args == ("r2", D.AGENT_IDENTIFIER)
+    assert prompt.title == "Approve segmenter:1.0"
+    # The newest placeable flavour, deployed under the approval its caller made.
+    assert deployed == [("new", approval)]
+
+
+def test_without_an_approval_or_anyone_to_ask_the_engine_says_where_to_approve(monkeypatch):
+    with pytest.raises(D.PlacementError, match="approve it in orkestrator"):
+        auto_install(monkeypatch, CallerRekuest(), CallerTask())
+
+
+def test_a_declined_approval_installs_nothing(monkeypatch):
+    task = CallerTask(deny="not on this host")
+    with pytest.raises(D.PlacementError, match="declined: not on this host"):
+        auto_install(monkeypatch, CallerRekuest([SimpleNamespace(id="impl-ui")]), task)
