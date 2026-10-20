@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v2.3.0 (2026-10-20)
+
+### Features
+
+- An unapproved release is approved by whoever called the engine
+  ([`1db178a`](https://github.com/arkitektio/plugin_engine/commit/1db178a0d464287de31ba3108d66e0d61692a156))
+
+
 ## v2.2.1 (2026-10-20)
 
 ### Bug Fixes
