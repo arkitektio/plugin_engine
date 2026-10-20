@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v2.2.1 (2026-10-20)
+
+### Bug Fixes
+
+- The engine verifies a hub's signed challenges
+  ([`693b56d`](https://github.com/arkitektio/plugin_engine/commit/693b56d74f7ecaeb8758f0c58c447bd7e34ff46d))
+
+
 ## v2.2.0 (2026-10-20)
 
 ### Features
