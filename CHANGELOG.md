@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v2.2.0 (2026-10-20)
+
+### Features
+
+- The engine marks its containers with the instance id it is attached as
+  ([`b08ea13`](https://github.com/arkitektio/plugin_engine/commit/b08ea13090e968ecc7cf9eb11d2c598201990fc4))
+
+
 ## v2.1.0 (2026-10-20)
 
 ### Features
