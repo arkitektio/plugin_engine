@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v2.3.1 (2026-10-23)
+
+### Bug Fixes
+
+- **deps**: Arkitekt 8, arkitekt-runtime 5.1
+  ([`dbc63ae`](https://github.com/arkitektio/plugin_engine/commit/dbc63ae27f98fd98fa1795f651bda310adf0ac49))
+
+
 ## v2.3.0 (2026-10-20)
 
 ### Features
