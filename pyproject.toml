@@ -8,7 +8,7 @@ authors = [
 ]
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "arkitekt[all]>=7.2.0",
+    "arkitekt[all]>=8.0.0",
     # Verifies the signed challenges of a hub that pins its services' keys. Optional in
     # fakts (not every platform has a wheel); this image's platforms all do.
     "fakts[crypto]>=6.0.1",
@@ -18,7 +18,7 @@ dependencies = [
     # 9.1: ImplementationAgentFilter.caller_of, how auto_install finds its callers.
     "rekuest>=9.1.0",
     # 4.7.3: a call to a chosen implementation (the caller's own agent) goes to it.
-    "arkitekt-runtime>=4.7.3",
+    "arkitekt-runtime>=5.1.0",
     "docker",
 ]
 
