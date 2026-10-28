@@ -136,7 +136,7 @@ app = App(
     AGENT_IDENTIFIER,
     __version__,
     author="jhnnsrs",
-    scopes=["read", "write"],
+    # No scopes of its own: it asks for what its kabinet and rekuest clients need (their SCOPES).
     description="Runs approved app releases as Docker containers on this host.",
     services=[kabinet_service, unlok_service, rekuest_service],
 )
