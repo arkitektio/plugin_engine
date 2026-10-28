@@ -2,6 +2,24 @@
 
 <!-- version list -->
 
+## v4.0.0 (2026-10-28)
+
+### Build System
+
+- Arkitekt 10, kabinet 6.1, rekuest 11.1, unlok 5.2
+  ([`10e2f12`](https://github.com/arkitektio/plugin_engine/commit/10e2f12c64d890b5ef6455cc898eed2dfbe444c3))
+
+### Features
+
+- Ask for the scopes the engine's clients need, not read/write
+  ([`f10c8c2`](https://github.com/arkitektio/plugin_engine/commit/f10c8c2b4d197dec21f9b9033b1d31e98dc13e1b))
+
+### Breaking Changes
+
+- Needs servers that declare their own scopes, and konstruktor releases that approve the engine with
+  them.
+
+
 ## v3.0.0 (2026-10-28)
 
 ### Features
