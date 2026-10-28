@@ -2,6 +2,18 @@
 
 <!-- version list -->
 
+## v3.0.0 (2026-10-28)
+
+### Features
+
+- On arkitekt 9 (blok v2, the organization-identifier servers)
+  ([`2b3f0fe`](https://github.com/arkitektio/plugin_engine/commit/2b3f0feefefdd0e64dd426ae2d971bfe6b9ad13e))
+
+### Breaking Changes
+
+- Needs a hub with the servers of that wave (rekuest 11, mikro 12, ...).
+
+
 ## v2.3.1 (2026-10-23)
 
 ### Bug Fixes
