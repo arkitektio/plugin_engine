@@ -8,17 +8,22 @@ authors = [
 ]
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "arkitekt[all]>=9.0",
+    "arkitekt[all]>=10.0",
     # Verifies the signed challenges of a hub that pins its services' keys. Optional in
     # fakts (not every platform has a wheel); this image's platforms all do.
     "fakts[crypto]>=6.0.1",
     # Pages through a backend's pods (MyPods) and reads a pod that may be gone (myPodAt);
     # 5.4: REQUEST_APPROVAL, the demand auto_install looks for among its callers.
-    "kabinet>=5.4.0",
+    # 6.1: the client carries the scopes its operations need (KabinetApi.__scopes__).
+    "kabinet>=6.1.0",
     # 9.1: ImplementationAgentFilter.caller_of, how auto_install finds its callers.
-    "rekuest>=9.1.0",
+    # 11.1: the client carries the scopes its operations need (RekuestApi.__scopes__).
+    "rekuest>=11.1.0",
     # 4.7.3: a call to a chosen implementation (the caller's own agent) goes to it.
     "arkitekt-runtime>=6.0",
+    # 5.2: the client carries the lok scopes its operations need (Unlok.__scopes__), which
+    # the engine's manifest asks for and konstruktor approves it with.
+    "unlok>=5.2.0",
     "docker",
 ]
 
