@@ -148,35 +148,34 @@ app = App(
 app.blok(
     "plugin_engine_logo",
     """
-    <SVG viewBox="0 0 64 64" title="Plugin engine">
+    <AgentLogo viewBox="0 0 64 64" title="Plugin engine">
       <Defs>
         <LinearGradient id="ground" x1="0" y1="0" x2="1" y2="1">
-          <Stop offset="0" stopColor="#140d2b" />
-          <Stop offset="1" stopColor="#2b1d58" />
+          <Stop offset="0" stopColor="ink" />
+          <Stop offset="1" stopColor="spectrum-violet" />
         </LinearGradient>
         <ClipPath id="tile"><Rect x="0" y="0" width="64" height="64" rx="14" /></ClipPath>
       </Defs>
       <G clipPath="url(#tile)">
         <Rect x="0" y="0" width="64" height="64" fill="url(#ground)" />
         <G animate="spin">
-          <Circle cx="50" cy="14" r="7" fill="none" stroke="#94a3b8" strokeWidth="4" strokeDasharray="2.75 2.75" />
-          <Circle cx="50" cy="14" r="6" fill="#94a3b8" />
-          <Circle cx="50" cy="14" r="2.4" fill="#211645" />
+          <Circle cx="50" cy="14" r="7" fill="none" stroke="muted" strokeWidth="4" strokeDasharray="2.75 2.75" />
+          <Circle cx="50" cy="14" r="6" fill="muted" />
+          <Circle cx="50" cy="14" r="2.4" fill="ink" />
         </G>
-        <Rect x="33" y="38" width="22" height="16" rx="2" fill="#a78bfa" />
-        <Path d="M38 41v10M43 41v10M48 41v10" stroke="#2e1065" strokeOpacity="0.35" strokeWidth="1.6" strokeLinecap="round" />
-        <Rect x="9" y="38" width="22" height="16" rx="2" fill="#38bdf8" />
-        <Circle cx="32" cy="46" r="3.6" fill="#38bdf8" />
-        <Path d="M14 41v10M19 41v10M24 41v10" stroke="#082f49" strokeOpacity="0.35" strokeWidth="1.6" strokeLinecap="round" />
-        <Rect x="21" y="20" width="22" height="16" rx="2" fill="#34d399" />
-        <Circle cx="32" cy="36.5" r="3.6" fill="#34d399" />
-        <Path d="M26 23v10M31 23v10M36 23v10" stroke="#064e3b" strokeOpacity="0.35" strokeWidth="1.6" strokeLinecap="round" />
+        <Rect x="33" y="38" width="22" height="16" rx="2" fill="spectrum-violet" />
+        <Path d="M38 41v10M43 41v10M48 41v10" stroke="spectrum-violet" strokeOpacity="0.35" strokeWidth="1.6" strokeLinecap="round" />
+        <Rect x="9" y="38" width="22" height="16" rx="2" fill="spectrum-cyan" />
+        <Circle cx="32" cy="46" r="3.6" fill="spectrum-cyan" />
+        <Path d="M14 41v10M19 41v10M24 41v10" stroke="ink" strokeOpacity="0.35" strokeWidth="1.6" strokeLinecap="round" />
+        <Rect x="21" y="20" width="22" height="16" rx="2" fill="spectrum-green" />
+        <Circle cx="32" cy="36.5" r="3.6" fill="spectrum-green" />
+        <Path d="M26 23v10M31 23v10M36 23v10" stroke="ink" strokeOpacity="0.35" strokeWidth="1.6" strokeLinecap="round" />
       </G>
-      <Rect x="0.5" y="0.5" width="63" height="63" rx="13.5" fill="none" stroke="#a78bfa" strokeOpacity="0.3" strokeWidth="1" />
-    </SVG>
+      <Rect x="0.5" y="0.5" width="63" height="63" rx="13.5" fill="none" stroke="spectrum-violet" strokeOpacity="0.3" strokeWidth="1" />
+    </AgentLogo>
     """,
     description="App containers fitted together like puzzle pieces, beside a turning gear.",
-    context="logo",
     default=True,
 )
 
@@ -200,7 +199,6 @@ def _action_logo(name: str, title: str, body: str) -> str:
         name,
         f'<ActionLogo viewBox="0 0 24 24" title="{title}"><G {_PEN}>{body}</G></ActionLogo>',
         description=f"{title}.",
-        context="action_logo",
     )
     return name
 
