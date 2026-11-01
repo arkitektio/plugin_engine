@@ -8,7 +8,7 @@ authors = [
 ]
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "arkitekt[all]>=10.0",
+    "arkitekt[all]>=12.1.0",
     # Verifies the signed challenges of a hub that pins its services' keys. Optional in
     # fakts (not every platform has a wheel); this image's platforms all do.
     "fakts[crypto]>=6.0.1",
