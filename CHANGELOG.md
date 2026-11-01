@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v4.0.1 (2026-11-01)
+
+### Bug Fixes
+
+- Release an image built on arkitekt 12.1.0
+  ([`7f5ba8b`](https://github.com/arkitektio/plugin_engine/commit/7f5ba8b104cf028d6ba1ad0ffd982c57a50240f9))
+
+### Build System
+
+- Lock arkitekt 12.1.0
+  ([`cd19492`](https://github.com/arkitektio/plugin_engine/commit/cd19492535a71615466aceae30f2c42edf626c5d))
+
+
 ## v4.0.0 (2026-10-28)
 
 ### Build System
