@@ -25,7 +25,7 @@ OLD = "2020-01-01T00:00:00.123456789Z"
 
 
 def now_iso() -> str:
-    return datetime.datetime.now(datetime.timezone.utc).isoformat()
+    return datetime.datetime.now(datetime.UTC).isoformat()
 
 
 # --- fakes -------------------------------------------------------------------------------

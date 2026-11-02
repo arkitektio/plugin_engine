@@ -84,7 +84,8 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Annotated, Any, Iterable
+from typing import Annotated, Any
+from collections.abc import Iterable
 
 import docker
 import docker.errors
@@ -761,7 +762,7 @@ def _age_seconds(container: Container) -> float:
         when = datetime.datetime.fromisoformat(re.sub(r"(\.\d{6})\d+", r"\1", created).replace("Z", "+00:00"))
     except ValueError:
         return 0.0
-    return (datetime.datetime.now(datetime.timezone.utc) - when).total_seconds()
+    return (datetime.datetime.now(datetime.UTC) - when).total_seconds()
 
 
 def _container_logs(container: Container | None, tail: int = LOG_TAIL) -> str:
@@ -984,7 +985,7 @@ def _reconcile(kabinet: Kabinet, unlok: Unlok, ctx: DeployerContext, health: Dep
     health.containers = len(containers)
     health.pods = len(pods)
     health.last_error = errors[-1] if errors else None
-    health.last_sweep_at = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
+    health.last_sweep_at = datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds")
 
 
 class _EventPump:

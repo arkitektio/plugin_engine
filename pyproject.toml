@@ -31,6 +31,9 @@ dependencies = [
 [tool.uv]
 package = false
 
+[tool.ruff.lint]
+extend-select = ["UP"]
+extend-ignore = ["UP037", "UP038", "UP042", "UP040", "UP046", "UP047", "UP049"]
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
