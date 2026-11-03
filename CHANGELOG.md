@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v4.0.3 (2026-11-03)
+
+### Bug Fixes
+
+- Build on arkitekt 13.1.0
+  ([`a09e4a2`](https://github.com/arkitektio/plugin_engine/commit/a09e4a22f107cecd880fa327809b5c5a8a8b6f20))
+
+### Refactoring
+
+- Adopt Python 3.11 typing (X | None, builtin generics, collections.abc)
+  ([`8b2dbce`](https://github.com/arkitektio/plugin_engine/commit/8b2dbce9ebc55cb95eea81747a0c1809a38b1375))
+
+
 ## v4.0.2 (2026-11-01)
 
 ### Bug Fixes

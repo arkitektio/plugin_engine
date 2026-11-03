@@ -128,7 +128,7 @@ from unlok.api.schema import IssuedMandateKey
 logger = logging.getLogger(__name__)
 
 # The version of the app. A release is the commit tagged with it (v1.2.3).
-__version__ = "4.0.2"
+__version__ = "4.0.3"
 
 AGENT_IDENTIFIER = "plugin_engine"
 """The app identifier a mandate must name for this deployer to issue keys under it."""
