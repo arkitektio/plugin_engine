@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v4.0.5 (2026-11-05)
+
+### Bug Fixes
+
+- Build on arkitekt 13.3, whose release also moves the 4-vanilla tag
+  ([`9da80d0`](https://github.com/arkitektio/plugin_engine/commit/9da80d083b6c4721963c138d18bcba42932a36c7))
+
+
 ## v4.0.4 (2026-11-05)
 
 ### Bug Fixes
