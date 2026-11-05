@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v4.0.4 (2026-11-05)
+
+### Bug Fixes
+
+- The apps the engine starts run as the engine's device
+  ([`a8ac1bc`](https://github.com/arkitektio/plugin_engine/commit/a8ac1bc9716e8886c11c95db356ab93c6ca55769))
+
+
 ## v4.0.3 (2026-11-03)
 
 ### Bug Fixes
