@@ -43,7 +43,8 @@ it (konstruktor, beside a hub) mounts the socket and sets the environment below.
 values must then be set, because their defaults change whenever the container is
 recreated: ``ARKITEKT_INSTANCE_ID`` (the hostname is the container id, and every plugin
 labelled with the old one would be taken for someone else's) and ``ARKITEKT_DEVICE_ID``.
-konstruktor sets both for every app it attaches.
+konstruktor sets both for every app it attaches. The apps the engine starts run as its
+device: each container is handed the engine's ``ARKITEKT_DEVICE_ID``, across restarts.
 The host is described from ``docker info``, which is the daemon's host. GPUs are read
 with ``nvidia-smi``, and where the engine's own image has none, inside a throwaway
 container the NVIDIA runtime hands it to.
@@ -1081,17 +1082,18 @@ def watch_containers(context: DeployerContext, health: DeployerHealth, kabinet: 
 # --- deploying ---------------------------------------------------------------------------
 
 
-def _instance_device_id(ctx: DeployerContext) -> str:
-    """A device id for one container. A lok client is unique per (release, user, device,
-    hub), so two containers of one release on this host must not share a device id."""
-    return f"{ctx.device_id}:{uuid.uuid4().hex[:12]}"
-
-
 def _issue_key(unlok: Unlok, approval: ReleaseApproval, device_id: str) -> IssuedMandateKey:
     """A mandate key for one container: a child of the approval's mandate, pinned to the
-    container's device id, acting as the approver. lok shows the key only here."""
+    engine's device id, acting as the approver. lok shows the key only here.
+
+    Every container this engine starts is this engine's device. They are still one client
+    each: a client logging in with a mandate key is the (mandate, device) pair, and each
+    container has a key, so a mandate, of its own."""
+    release = approval.release
     return unlok.issue_child_mandate_key(
-        mandate=approval.mandate_id, device_id=device_id, label=f"{AGENT_IDENTIFIER} {device_id}"
+        mandate=approval.mandate_id,
+        device_id=device_id,
+        label=f"{AGENT_IDENTIFIER}: {release.app.identifier}:{release.version} on {device_id}",
     )
 
 
@@ -1243,7 +1245,7 @@ def _deploy_flavour(
     )
 
     task.progress(65, "Issuing a key under the approval's mandate")
-    device_id = _instance_device_id(ctx)
+    device_id = ctx.device_id
     key = _issue_key(unlok, approval, device_id)
 
     task.progress(70, "Starting container")
@@ -1365,7 +1367,7 @@ def _recreate(kabinet: Kabinet, unlok: Unlok, task: Task, ctx: DeployerContext, 
     _check_mandate(unlok, approval)
     resource = _select_resource(ctx, flavour)
     task.progress(10, "Issuing a fresh key")
-    device_id = _instance_device_id(ctx)
+    device_id = ctx.device_id
     key = _issue_key(unlok, approval, device_id)
     task.progress(40, f"Removing {old.name}")
     old_key = old.labels.get(LABEL_KEY_MANDATE)

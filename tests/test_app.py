@@ -475,6 +475,28 @@ def test_a_plugin_logs_in_with_its_mandate_key_and_carries_its_mandate():
     assert KEY.key not in docker_client.run_kwargs.get("command", "")
 
 
+def test_a_recreated_container_stays_the_engines_device(monkeypatch):
+    """A fresh key, the same device: every container the engine starts is its device,
+    so recreating one is not a new device to the coordination server or the mesh."""
+    issued, launched = [], []
+    unlok = SimpleNamespace(issue_child_mandate_key=lambda **kwargs: issued.append(kwargs) or KEY)
+    kabinet = FakeKabinet([make_pod("a", client_id="client-a")])
+    kabinet.get_release_approval = lambda approval_id: approval_for()
+    monkeypatch.setattr(D, "_check_approval", lambda ctx, approval: None)
+    monkeypatch.setattr(D, "_check_mandate", lambda unlok, approval: None)
+    monkeypatch.setattr(D, "_select_resource", lambda ctx, flavour: None)
+    monkeypatch.setattr(D, "_revoke_key", lambda unlok, mandate_id: None)
+    monkeypatch.setattr(D, "_launch_keyed", lambda *args: launched.append(args[6]) or (FakeContainer("c2"), "new-pod"))
+    old = FakeContainer("c1", pod_key="a", **{D.LABEL_DEPLOYMENT: "d1", D.LABEL_APPROVAL: "ap1"})
+    ctx = make_ctx(FakeDocker([old]))
+    task = SimpleNamespace(progress=lambda *args: None)
+
+    D._recreate(kabinet, unlok, task, ctx, kabinet.pods["a"], old)
+
+    assert [kwargs["device_id"] for kwargs in issued] == ["dev"]
+    assert launched == ["dev"]
+
+
 def test_a_key_nobody_runs_is_revoked():
     docker_client = FakeDocker()
     docker_client.run_error = docker.errors.APIError("could not select device driver")
