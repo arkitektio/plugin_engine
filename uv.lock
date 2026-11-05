@@ -2,9 +2,11 @@ version = 1
 revision = 5
 requires-python = "==3.12.*"
 resolution-markers = [
-    "sys_platform == 'win32'",
+    "(platform_machine == 'AMD64' and platform_python_implementation == 'CPython' and sys_platform == 'win32') or (platform_machine == 'ARM64' and platform_python_implementation == 'CPython' and sys_platform == 'win32')",
+    "(platform_machine != 'AMD64' and platform_machine != 'ARM64' and sys_platform == 'win32') or (platform_machine == 'AMD64' and platform_python_implementation != 'CPython' and sys_platform == 'win32') or (platform_machine == 'ARM64' and platform_python_implementation != 'CPython' and sys_platform == 'win32')",
     "sys_platform == 'emscripten'",
-    "sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "(platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (platform_python_implementation == 'CPython' and sys_platform == 'darwin')",
+    "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (platform_machine == 'aarch64' and platform_python_implementation != 'CPython' and sys_platform == 'linux') or (platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux') or (platform_python_implementation != 'CPython' and sys_platform == 'darwin') or (sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32')",
 ]
 
 [[package]]
@@ -125,13 +127,14 @@ wheels = [
 
 [[package]]
 name = "arkitekt"
-version = "13.1.0"
+version = "13.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
     { name = "arkitekt-spec" },
     { name = "click" },
     { name = "fakts", extra = ["crypto"] },
+    { name = "fakts", extra = ["mesh"], marker = "(platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (platform_machine == 'AMD64' and platform_python_implementation == 'CPython' and sys_platform == 'win32') or (platform_machine == 'ARM64' and platform_python_implementation == 'CPython' and sys_platform == 'win32') or (platform_python_implementation == 'CPython' and sys_platform == 'darwin')" },
     { name = "koil" },
     { name = "platformdirs" },
     { name = "py-machineid" },
@@ -142,9 +145,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "watchfiles" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4c/f5/7fb7f445dc36186f1d39004c8712960a82f905d2d619b48778f1ec653d9e/arkitekt-13.1.0.tar.gz", hash = "sha256:c561c2ed2cb3f363247bd34ebb933965f7a5a1d5a635d6a03a7f0f13e8098f62", size = 201402, upload-time = "2026-11-01T20:27:04.02Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/87/3b/e1ee29663967d058758fc4c34670803a34ee95d942f17accba084ef0a805/arkitekt-13.3.0.tar.gz", hash = "sha256:a5cf801dc76905040ac52189e545919a1eee94196ef7ddbc077731369b94df99", size = 201768, upload-time = "2026-11-05T14:17:17.858Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/26/ae/9f76a8568b6488dc98e3ad5a4218a6d697e871dae35c56ab317969426e08/arkitekt-13.1.0-py3-none-any.whl", hash = "sha256:41f3c5044833acee229fe24d6a0727718caf1989b2baff584fa7d8a5d39058af", size = 249257, upload-time = "2026-11-01T20:27:02.457Z" },
+    { url = "https://files.pythonhosted.org/packages/ca/a3/5b8561e022bf756b7491b17a999cea3f1507a309e0ec3f36d390a6bda8c4/arkitekt-13.3.0-py3-none-any.whl", hash = "sha256:737401cad7ccf8aa58eccba7172ea77e2e85e4635149b8a1756ba0d75af5af6a", size = 249482, upload-time = "2026-11-05T14:17:15.976Z" },
 ]
 
 [package.optional-dependencies]
@@ -159,6 +162,21 @@ all = [
     { name = "mikro" },
     { name = "rekuest" },
     { name = "unlok" },
+]
+
+[[package]]
+name = "arkitekt-mesh"
+version = "0.11.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/d9/f8/1935bdaeab33314cf59b5384d6de3e3196162e88b3d5a9f564e1a462ccd3/arkitekt_mesh-0.11.0.tar.gz", hash = "sha256:ddcc415914d75487344907326e818661c14296bc15bc4e08a6665e03785207ab", size = 609440, upload-time = "2026-10-30T09:37:27.186Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1f/39/16a1675f17cc0815359a3e3c0b56994f56e7ea74598d018807ebe7737794/arkitekt_mesh-0.11.0-cp39-abi3-macosx_10_12_universal2.macosx_10_12_x86_64.macosx_11_0_arm64.whl", hash = "sha256:2d71005979b76d30941612d785281f58da4e56ac3583d1dfec1e9a849f3e555b", size = 6338845, upload-time = "2026-10-30T09:37:16.25Z" },
+    { url = "https://files.pythonhosted.org/packages/9d/b8/9f57f0b003787172514e4f86a8641236e21a77af0b526714871b951bd0a2/arkitekt_mesh-0.11.0-cp39-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:1e7ca5ea6a64021245830696965c69f81545137f1d07e4b1dace7e6ffd6a8c0c", size = 3582127, upload-time = "2026-10-30T09:37:17.891Z" },
+    { url = "https://files.pythonhosted.org/packages/94/91/0dd977b6a3e16dbc85fb8436d6ba678069edd8b0763808d2a6c2b6d16b5d/arkitekt_mesh-0.11.0-cp39-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:07b42ccd1b5f42dee0943a832f95438bbbaee58c1b79b97ed4e99c7a131e4e9e", size = 3520184, upload-time = "2026-10-30T09:37:19.589Z" },
+    { url = "https://files.pythonhosted.org/packages/f3/cf/834c475046728081591803744662a8d8dd7c230ff1cb3c97a721947739e4/arkitekt_mesh-0.11.0-cp39-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:08ea48ab53d1b7bcc457ca8354768480efcda6308c934cd1fd6439ea94ad5208", size = 3749770, upload-time = "2026-10-30T09:37:21.231Z" },
+    { url = "https://files.pythonhosted.org/packages/e6/ef/d7a29e3c3ee378e9e478b9b90c2a02d39b8fcb7f9c0dec05e63910df560f/arkitekt_mesh-0.11.0-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:3eb89d76243071a45ae98f5b941e6ec727273409f8ab5afad78fc8ffcb9f2325", size = 3832910, upload-time = "2026-10-30T09:37:22.727Z" },
+    { url = "https://files.pythonhosted.org/packages/34/e7/b45794b5fe530a511a4ce100b9c323efa0a90b9af7b723c3575037e9e33c/arkitekt_mesh-0.11.0-cp39-abi3-win_amd64.whl", hash = "sha256:6e4f0cba6fda9a69e39f8d4b70affc7c026df828948aaee4ad7726055cd9bc91", size = 2983410, upload-time = "2026-10-30T09:37:24.253Z" },
+    { url = "https://files.pythonhosted.org/packages/67/86/32c34bc15a131b7865e01cd77309b8296335fe55230e0e9e7d2117a85834/arkitekt_mesh-0.11.0-cp39-abi3-win_arm64.whl", hash = "sha256:3c0666046ace1018fe77bedcd3f0fd7882caa2bafd5c4967de1cb0def836ee9b", size = 2802300, upload-time = "2026-10-30T09:37:25.729Z" },
 ]
 
 [[package]]
@@ -465,6 +483,9 @@ wheels = [
 [package.optional-dependencies]
 crypto = [
     { name = "cryptography" },
+]
+mesh = [
+    { name = "arkitekt-mesh" },
 ]
 
 [[package]]
@@ -1006,7 +1027,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "arkitekt", extras = ["all"], specifier = ">=13.1.0" },
+    { name = "arkitekt", extras = ["all"], specifier = ">=13.3.0" },
     { name = "arkitekt-runtime", specifier = ">=6.0" },
     { name = "docker" },
     { name = "fakts", extras = ["crypto"], specifier = ">=6.0.1" },
