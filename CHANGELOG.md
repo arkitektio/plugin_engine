@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v4.0.6 (2026-11-10)
+
+### Bug Fixes
+
+- **deps**: Arkitekt 14.1.0 and mikro 13, with the Open in Arkitekt badge
+  ([`04a4567`](https://github.com/arkitektio/plugin_engine/commit/04a4567b23b7097997429600beda3c7cd6d30e89))
+
+
 ## v4.0.5 (2026-11-05)
 
 ### Bug Fixes
