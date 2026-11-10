@@ -8,7 +8,7 @@ authors = [
 ]
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "arkitekt[all]>=13.3.0",
+    "arkitekt[all]>=14.1.0",
     # Verifies the signed challenges of a hub that pins its services' keys. Optional in
     # fakts (not every platform has a wheel); this image's platforms all do.
     "fakts[crypto]>=6.0.1",
@@ -18,9 +18,9 @@ dependencies = [
     "kabinet>=6.1.0",
     # 9.1: ImplementationAgentFilter.caller_of, how auto_install finds its callers.
     # 11.1: the client carries the scopes its operations need (RekuestApi.__scopes__).
-    "rekuest>=11.1.0",
+    "rekuest>=13.1.0",
     # 4.7.3: a call to a chosen implementation (the caller's own agent) goes to it.
-    "arkitekt-runtime>=6.0",
+    "arkitekt-runtime>=9.0",
     # 5.2: the client carries the lok scopes its operations need (Unlok.__scopes__), which
     # the engine's manifest asks for and konstruktor approves it with.
     "unlok>=5.2.0",

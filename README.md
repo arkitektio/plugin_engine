@@ -1,5 +1,9 @@
 # plugin_engine
 
+<!-- arkitekt:badge -->
+[![Open in Arkitekt](https://arkitekt.live/img/badge/open-in-arkitekt.svg)](https://arkitekt.live/deeplink?orkestrator=%2Fdo%2Fv1%2Frepo.install%3Fsource%3Doci%253Aghcr.io%252Farkitektio%252Fplugin_engine)
+<!-- /arkitekt:badge -->
+
 A kabinet backend that runs approved app releases as Docker containers.
 
 The engine registers one backend and one resource: the host of the Docker daemon it is
