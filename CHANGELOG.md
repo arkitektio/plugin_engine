@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v4.0.7 (2026-11-15)
+
+### Bug Fixes
+
+- **deps**: Arkitekt 16, on agent protocol 2
+  ([`bfc8a7e`](https://github.com/arkitektio/plugin_engine/commit/bfc8a7e35bedb341c327087d8de9715cd27204dd))
+
+
 ## v4.0.6 (2026-11-10)
 
 ### Bug Fixes
