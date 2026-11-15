@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v4.0.8 (2026-11-15)
+
+### Bug Fixes
+
+- **deps**: Rekuest 15.0.1 and arkitekt-runtime 10.0.1
+  ([`ba664c1`](https://github.com/arkitektio/plugin_engine/commit/ba664c19b2838c0be52b3109e9332d9b0b4ea771))
+
+
 ## v4.0.7 (2026-11-15)
 
 ### Bug Fixes
