@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v4.0.9 (2026-11-15)
+
+### Bug Fixes
+
+- **deps**: Arkitekt 17 and arkitekt-spec 11
+  ([`06edfdc`](https://github.com/arkitektio/plugin_engine/commit/06edfdc2a94851fe11005b453f07d64db9578e25))
+
+
 ## v4.0.8 (2026-11-15)
 
 ### Bug Fixes
