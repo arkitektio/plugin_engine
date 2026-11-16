@@ -702,7 +702,8 @@ def test_the_app_and_every_action_have_a_logo():
     assert bloks["plugin_engine_logo"]["context"] == "LOGO"
     logos = [implementation.get("logo") for implementation in declaration["implementations"]]
     assert None not in logos
-    assert {bloks[logo]["context"] for logo in logos} == {"ACTION_LOGO"}
+    assert {bloks[logo]["context"] for logo in logos} == {"LOGO"}
+    assert {D.app.registry.registered_bloks[logo].kind for logo in logos} == {"action"}
 
 
 # --- the apps, as agents ----------------------------------------------------------------------

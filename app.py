@@ -150,7 +150,8 @@ app = App(
 app.blok(
     "plugin_engine_logo",
     """
-    <AgentLogo viewBox="0 0 64 64" title="Plugin engine">
+    <Blok kind="agent" context="logo">
+    <Logo viewBox="0 0 64 64" title="Plugin engine">
       <Defs>
         <LinearGradient id="ground" x1="0" y1="0" x2="1" y2="1">
           <Stop offset="0" stopColor="ink" />
@@ -175,7 +176,8 @@ app.blok(
         <Path d="M26 23v10M31 23v10M36 23v10" stroke="ink" strokeOpacity="0.35" strokeWidth="1.6" strokeLinecap="round" />
       </G>
       <Rect x="0.5" y="0.5" width="63" height="63" rx="13.5" fill="none" stroke="spectrum-violet" strokeOpacity="0.3" strokeWidth="1" />
-    </AgentLogo>
+    </Logo>
+    </Blok>
     """,
     description="App containers fitted together like puzzle pieces, beside a turning gear.",
     default=True,
@@ -199,7 +201,7 @@ def _action_logo(name: str, title: str, body: str) -> str:
     """Declare the action logo ``name`` that draws ``body`` on a 24 px grid; returns the name."""
     app.blok(
         name,
-        f'<ActionLogo viewBox="0 0 24 24" title="{title}"><G {_PEN}>{body}</G></ActionLogo>',
+        f'<Blok kind="action" context="logo"><Logo viewBox="0 0 24 24" title="{title}"><G {_PEN}>{body}</G></Logo></Blok>',
         description=f"{title}.",
     )
     return name
