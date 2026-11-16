@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v4.0.10 (2026-11-16)
+
+### Bug Fixes
+
+- Bloks are self-contained <Blok kind context> trees
+  ([`1686049`](https://github.com/arkitektio/plugin_engine/commit/168604978b847a90e43624a8291bcd62f8f0db8b))
+
+### Build System
+
+- Lock arkitekt 18
+  ([`a7e738f`](https://github.com/arkitektio/plugin_engine/commit/a7e738fe4158eda2219bb2b500ee02f4a4b72d55))
+
+
 ## v4.0.9 (2026-11-15)
 
 ### Bug Fixes
