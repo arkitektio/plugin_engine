@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v4.0.11 (2026-11-19)
+
+### Bug Fixes
+
+- **deps**: Arkitekt 18.2, rekuest 16.2, kabinet 9 and arkitekt-runtime 10.4
+  ([`b4f0c27`](https://github.com/arkitektio/plugin_engine/commit/b4f0c27db1df75c24e9fa72e04b1d34f392ee4b9))
+
+
 ## v4.0.10 (2026-11-16)
 
 ### Bug Fixes
