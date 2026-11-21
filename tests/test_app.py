@@ -713,7 +713,7 @@ def make_agent(client_id="client", org="lab"):
     return SimpleNamespace(
         name=f"agent of {client_id}",
         client=SimpleNamespace(client_id=client_id),
-        organization=SimpleNamespace(slug=org),
+        organization=SimpleNamespace(identifier=org),
     )
 
 

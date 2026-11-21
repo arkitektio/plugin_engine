@@ -1454,7 +1454,7 @@ def _pod_of(kabinet: Kabinet, context: DeployerContext, agent: Agent) -> Pod:
 
 def _check_caller(task: Task, agent: Agent) -> None:
     """Only a caller of the agent's own organization may act on it."""
-    if task.org != agent.organization.slug:
+    if task.org != agent.organization.identifier:
         raise NotMine(f"{agent.name} belongs to another organization than the caller's")
 
 
