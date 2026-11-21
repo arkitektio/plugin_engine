@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v4.0.12 (2026-11-21)
+
+### Bug Fixes
+
+- Check the caller against the agent organization's identifier
+  ([`f9d1f4d`](https://github.com/arkitektio/plugin_engine/commit/f9d1f4dafac888ad4057ce4336cc3f9070e000dd))
+
+
 ## v4.0.11 (2026-11-19)
 
 ### Bug Fixes
