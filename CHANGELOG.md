@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v4.0.13 (2026-11-24)
+
+### Bug Fixes
+
+- Build on arkitekt 18.5.2, rekuest 18, arkitekt-spec 13 and mikro 14.2
+  ([`a446cf1`](https://github.com/arkitektio/plugin_engine/commit/a446cf1700db7bb4856278ef575d02edc39f88a5))
+
+
 ## v4.0.12 (2026-11-21)
 
 ### Bug Fixes
