@@ -101,11 +101,11 @@ from arkitekt import App, AssignPrompt, DeniedError, DescriptorOperator, Effects
 from arkitekt.device_id import get_or_set_device_id
 from kabinet import Kabinet
 from rekuest.api.schema import Agent
-from rekuest.arkitekt import SUPERVISOR, rekuest_service
+from rekuest import to
+from rekuest.structures import SUPERVISOR
 from rekuest.client.client import Rekuest
 from rekuest.protocol.schema import ImplementationAgentFilter, ImplementationFilter, OffsetPaginationInput
 from kabinet.callers import REQUEST_APPROVAL
-from kabinet import kabinet_service
 from kabinet.api.schema import (
     Backend,
     Definition,
@@ -123,7 +123,6 @@ from kabinet.api.schema import (
 from arkitekt import LogLevel
 from arkitekt import Task
 from unlok import Unlok
-from unlok import unlok_service
 from unlok.api.schema import IssuedMandateKey
 
 logger = logging.getLogger(__name__)
@@ -140,7 +139,6 @@ app = App(
     author="jhnnsrs",
     # No scopes of its own: it asks for what its kabinet and rekuest clients need (their SCOPES).
     description="Runs approved app releases as Docker containers on this host.",
-    services=[kabinet_service, unlok_service, rekuest_service],
 )
 
 # --- logos ------------------------------------------------------------------------
@@ -624,7 +622,8 @@ def _approval_from_callers(rekuest: Rekuest, task: Task, release: Any) -> Releas
         description=f"{AGENT_IDENTIFIER} needs your approval to run {name}; it then acts as you.",
     )
     try:
-        return task.call(callers[0], str(release.id), AGENT_IDENTIFIER, prompt=prompt)
+        # An untyped call returns a reference: fetch the approval it names.
+        return to(task.call(callers[0], str(release.id), AGENT_IDENTIFIER, prompt=prompt), ReleaseApproval)
     except DeniedError as denied:
         said = f": {denied.answer}" if denied.answer else "."
         raise PlacementError(f"Approving {name} was declined{said}") from denied
